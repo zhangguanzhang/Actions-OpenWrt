@@ -10,16 +10,18 @@ on:
   watch:
     types: started
 jobs:
-  build:
+  ssh-to-action:
     runs-on: ubuntu-latest
     steps:
      - uses: actions/checkout@v1
 
      - name: Try Build
+       id: try
        run: ./not-exist-file.sh it bloke build
+       continue-on-error: true
 
      - name: Start SSH via Ngrok
-       if: ${{ failure() }}
+       if: env.NGROK_TOKEN != null
        run: curl -sL https://gist.githubusercontent.com/retyui/7115bb6acf151351a143ec8f96a7c561/raw/7099b9db76729dc5761da72aa8525f632d8875c9/debug-github-actions.sh | bash
        env:
         # After sign up on the https://ngrok.com/
@@ -30,5 +32,5 @@ jobs:
         USER_PASS: ${{ secrets.USER_PASS }}
 
      - name: Don't kill instace
-       if: ${{ failure() }}
-       run: sleep 12h # Prevent to killing instance after failure
+       if: env.NGROK_TOKEN != null
+       run: sleep 5h # Prevent to killing instance after failure

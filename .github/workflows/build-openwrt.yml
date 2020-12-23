@@ -26,8 +26,8 @@ on:
     paths:
       - '.config'
       - '.github/workflows/build-openwrt.yml'
-#  schedule:
-#    - cron: 0 8 * * 5
+  schedule:
+    - cron: 0 8 * * 4
 
 env:
   REPO_URL: https://github.com/coolsnowwolf/lede
@@ -44,7 +44,7 @@ env:
   TZ: Asia/Shanghai
 
 jobs:
-  build:
+  Build-OpenWrt:
     runs-on: ubuntu-18.04
 
     steps:
