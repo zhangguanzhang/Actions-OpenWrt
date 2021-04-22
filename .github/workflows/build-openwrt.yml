@@ -27,7 +27,7 @@ on:
       - '.config'
       - '.github/workflows/build-openwrt.yml'
   schedule:
-    - cron: 0 8 * * 4
+    - cron: 0 3 * * 4/5
 
 env:
   REPO_URL: https://github.com/coolsnowwolf/lede
