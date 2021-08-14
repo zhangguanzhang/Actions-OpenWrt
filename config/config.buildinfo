@@ -1,0 +1,276 @@
+CONFIG_TARGET_x86=y
+CONFIG_TARGET_x86_64=y
+CONFIG_TARGET_x86_64_DEVICE_generic=y
+# CONFIG_QCOW2_IMAGES is not set
+# CONFIG_VMDK_IMAGES is not set
+CONFIG_TARGET_ROOTFS_PARTSIZE=2048
+
+CONFIG_BUSYBOX_DEFAULT_ACPID=y
+CONFIG_PACKAGE_acpid=y
+CONFIG_PACKAGE_qemu-ga=y
+
+CONFIG_PACKAGE_luci-theme-argon_new=y
+CONFIG_PACKAGE_luci-theme-atmaterial=y
+CONFIG_PACKAGE_luci-theme-edge=y
+CONFIG_PACKAGE_luci-theme-opentopd=y
+CONFIG_PACKAGE_luci-theme-ifit=y
+
+
+# modprobe
+CONFIG_BUSYBOX_DEFAULT_MODPROBE=y
+CONFIG_BUSYBOX_DEFAULT_FEATURE_MODPROBE_BLACKLIST=y
+
+CONFIG_BUSYBOX_DEFAULT_BB_ARCH=y
+CONFIG_BUSYBOX_DEFAULT_FEATURE_EDITING_SAVEHISTORY=y
+CONFIG_BUSYBOX_DEFAULT_FEATURE_EDITING_SAVE_ON_EXIT=y
+CONFIG_BUSYBOX_DEFAULT_FEATURE_REVERSE_SEARCH=y
+CONFIG_BUSYBOX_DEFAULT_UNICODE_SUPPORT=y
+CONFIG_BUSYBOX_DEFAULT_BASE64=y
+CONFIG_BUSYBOX_DEFAULT_LSMOD=y
+CONFIG_BUSYBOX_DEFAULT_INSMOD=y
+CONFIG_BUSYBOX_DEFAULT_MODINFO=y
+CONFIG_BUSYBOX_DEFAULT_MODPROBE=y
+CONFIG_BUSYBOX_DEFAULT_RMMOD=y
+CONFIG_BUSYBOX_DEFAULT_FEATURE_CMDLINE_MODULE_OPTIONS=y
+CONFIG_BUSYBOX_DEFAULT_LSPCI=y
+CONFIG_BUSYBOX_DEFAULT_LSUSB=y
+CONFIG_BUSYBOX_DEFAULT_IPROUTE=y
+
+CONFIG_PACKAGE_kmod-wireguard=y
+CONFIG_PACKAGE_luci-app-wireguard=y
+CONFIG_PACKAGE_luci-i18n-wireguard-zh-cn=y
+CONFIG_PACKAGE_luci-proto-wireguard=y
+CONFIG_PACKAGE_wireguard-tools=y
+
+CONFIG_PACKAGE_kmod-dummy=y
+
+CONFIG_PACKAGE_bash=y
+CONFIG_PACKAGE_bind-dig=y
+CONFIG_PACKAGE_ca-certificates=y
+CONFIG_PACKAGE_conntrack=y
+CONFIG_PACKAGE_fping=y
+CONFIG_PACKAGE_htop=y
+CONFIG_PACKAGE_iftop=y
+CONFIG_PACKAGE_jq=y
+CONFIG_PACKAGE_lrzsz=y
+CONFIG_PACKAGE_lscpu=y
+CONFIG_PACKAGE_lsof=y
+CONFIG_PACKAGE_lsblk=y
+CONFIG_PACKAGE_luci-compat=y
+CONFIG_PACKAGE_mount-utils=y
+CONFIG_PACKAGE_parted=y
+CONFIG_PACKAGE_socat=y
+CONFIG_PACKAGE_pciutils=y
+CONFIG_PACKAGE_psmisc=y
+CONFIG_PACKAGE_r8169-firmware=y
+CONFIG_PACKAGE_rsync=y
+CONFIG_PACKAGE_sshpass=y
+# CONFIG_PACKAGE_coreutils-nohup is not set
+CONFIG_PACKAGE_screen=y
+CONFIG_PACKAGE_sshfs=y
+CONFIG_PACKAGE_tcpdump=y
+
+CONFIG_PACKAGE_iperf3=y
+
+CONFIG_PACKAGE_ipvsadm=y
+CONFIG_PACKAGE_ipset=y
+
+CONFIG_PACKAGE_rclone=y
+CONFIG_PACKAGE_rclone-ng=y
+CONFIG_PACKAGE_rclone-webui-react=y
+
+CONFIG_PACKAGE_docker-ce=y
+CONFIG_PACKAGE_luci-app-docker=y
+CONFIG_PACKAGE_luci-i18n-docker-zh-cn=y
+CONFIG_PACKAGE_luci-lib-docker=y
+CONFIG_DOCKER_KERNEL_OPTIONS=y
+CONFIG_DOCKER_NET_MACVLAN=y
+CONFIG_DOCKER_RES_SHAPE=y
+CONFIG_DOCKER_STO_EXT4=y
+
+CONFIG_PACKAGE_luci-app-aria2=y
+CONFIG_PACKAGE_webui-aria2=y
+CONFIG_PACKAGE_aria2=y
+
+CONFIG_PACKAGE_luci-app-cifs-mount=y
+
+CONFIG_PACKAGE_luci-app-adguardhome=y
+
+# CONFIG_PACKAGE_luci-app-smartdns is not set
+# CONFIG_PACKAGE_luci-i18n-smartdns-zh-cn is not set
+# CONFIG_PACKAGE_smartdns is not set
+
+CONFIG_PACKAGE_luci-app-commands=y
+CONFIG_PACKAGE_luci-app-jd-dailybonus=y
+CONFIG_PACKAGE_luci-app-kodexplorer=y
+
+# CONFIG_PACKAGE_luci-app-clash is not set
+CONFIG_PACKAGE_luci-app-openclash=y
+
+CONFIG_PACKAGE_luci-app-passwall=y
+CONFIG_PACKAGE_luci-app-passwall_INCLUDE_Shadowsocks_Rust_Client=y
+CONFIG_PACKAGE_luci-app-passwall_INCLUDE_Trojan_GO=y
+
+# CONFIG_PACKAGE_luci-app-zerotier is not set
+# CONFIG_PACKAGE_luci-app-https-dns-proxy is not set
+# CONFIG_PACKAGE_https-dns-proxy is not set
+
+CONFIG_PACKAGE_netdata=y
+CONFIG_PACKAGE_luci-app-netdata=y
+
+CONFIG_PACKAGE_luci-app-unblockmusic=y
+CONFIG_PACKAGE_luci-app-unblockmusic_INCLUDE_UnblockNeteaseMusic_Go=y
+CONFIG_PACKAGE_luci-app-unblockmusic_INCLUDE_UnblockNeteaseMusic_NodeJS=y
+CONFIG_PACKAGE_luci-i18n-unblockmusic-zh-cn=y
+
+# CONFIG_PACKAGE_luci-app-serverchan is not set
+
+# CONFIG_PACKAGE_luci-app-ssr-plus is not set
+# CONFIG_PACKAGE_luci-i18n-ssr-plus-zh-cn is not set
+
+CONFIG_DEFAULT_luci-app-uugamebooster=y
+CONFIG_PACKAGE_luci-app-uugamebooster=y
+CONFIG_PACKAGE_luci-i18n-uugamebooster-zh-cn=y
+CONFIG_PACKAGE_uugamebooster=y
+
+# CONFIG_PACKAGE_prometheus-node-exporter-lua is not set
+# CONFIG_PACKAGE_prometheus-node-exporter-lua-nat_traffic is not set
+# CONFIG_PACKAGE_prometheus-node-exporter-lua-netstat is not set
+# CONFIG_PACKAGE_prometheus-node-exporter-lua-openwrt is not set
+# CONFIG_PACKAGE_prometheus-node-exporter-lua-textfile is not set
+
+CONFIG_DEFAULT_ppp-mod-pppoe=y
+CONFIG_PACKAGE_kmod-pppoe=y
+CONFIG_PACKAGE_luci-app-pppoe-relay=y
+# CONFIG_PACKAGE_luci-app-rp-pppoe-server is not set
+CONFIG_PACKAGE_luci-i18n-pppoe-relay-zh-cn=y
+CONFIG_PACKAGE_rp-pppoe-common=y
+CONFIG_PACKAGE_rp-pppoe-relay=y
+# CONFIG_PACKAGE_rp-pppoe-server is not set
+CONFIG_PACKAGE_ppp-mod-pppoe=y
+# CONFIG_PACKAGE_pppoe-discovery is not set
+
+CONFIG_PACKAGE_luci-app-udpxy=y
+CONFIG_PACKAGE_udpxy=y
+
+CONFIG_PACKAGE_luci-app-mwan3=y
+CONFIG_PACKAGE_luci-app-mwan3helper=y
+CONFIG_PACKAGE_luci-i18n-mwan3-zh-cn=y
+# CONFIG_PACKAGE_luci-i18n-mwan3-zh-tw is not set
+CONFIG_PACKAGE_luci-i18n-mwan3helper-zh-cn=y
+CONFIG_PACKAGE_mwan3=y
+
+CONFIG_PACKAGE_luci-app-minidlna=y
+CONFIG_PACKAGE_luci-i18n-minidlna-zh-cn=y
+# CONFIG_PACKAGE_luci-i18n-minidlna-zh-tw is not set
+CONFIG_PACKAGE_minidlna=y
+
+CONFIG_PACKAGE_luci-app-hd-idle=y
+CONFIG_PACKAGE_luci-i18n-hd-idle-zh-cn=y
+# CONFIG_PACKAGE_luci-i18n-hd-idle-zh-tw is not set
+CONFIG_PACKAGE_hd-idle=y
+
+# CONFIG_PACKAGE_luci-app-tinyproxy is not set
+# CONFIG_PACKAGE_luci-i18n-tinyproxy-zh-cn is not set
+# CONFIG_PACKAGE_tinyproxy is not set
+
+CONFIG_PACKAGE_luci-app-transmission=y
+CONFIG_PACKAGE_luci-i18n-transmission-zh-cn=y
+# CONFIG_PACKAGE_transmission-cli-openssl is not set
+CONFIG_PACKAGE_transmission-daemon-openssl=y
+# CONFIG_PACKAGE_transmission-remote-openssl is not set
+# CONFIG_PACKAGE_transmission-web is not set
+CONFIG_PACKAGE_transmission-web-control=y
+
+
+# for usb and usb-net
+CONFIG_PACKAGE_usb-modeswitch=y
+CONFIG_PACKAGE_luci-proto-3g=y
+CONFIG_PACKAGE_luci-proto-ncm=y
+CONFIG_PACKAGE_luci-proto-qmi=y
+CONFIG_PACKAGE_luci-proto-ppp=y
+CONFIG_PACKAGE_uqmi=y
+CONFIG_PACKAGE_usbutils=y
+CONFIG_PACKAGE_comgt-ncm=y
+
+CONFIG_PACKAGE_libusb-1.0=y
+
+CONFIG_BUSYBOX_DEFAULT_CHAT=y
+
+# USB Support
+#
+# CONFIG_PACKAGE_kmod-chaoskey is not set
+CONFIG_PACKAGE_kmod-usb-acm=y
+# CONFIG_PACKAGE_kmod-usb-atm is not set
+# CONFIG_PACKAGE_kmod-usb-cm109 is not set
+CONFIG_PACKAGE_kmod-usb-core=y
+# CONFIG_PACKAGE_kmod-usb-dwc2 is not set
+# CONFIG_PACKAGE_kmod-usb-dwc3 is not set
+CONFIG_PACKAGE_kmod-usb-hid=y
+# CONFIG_PACKAGE_kmod-usb-hid-cp2112 is not set
+# CONFIG_PACKAGE_kmod-usb-ledtrig-usbport is not set
+CONFIG_PACKAGE_kmod-usb-net=y
+# CONFIG_PACKAGE_kmod-usb-net-aqc111 is not set
+CONFIG_PACKAGE_kmod-usb-net-asix=y
+CONFIG_PACKAGE_kmod-usb-net-asix-ax88179=y
+CONFIG_PACKAGE_kmod-usb-net-cdc-eem=y
+CONFIG_PACKAGE_kmod-usb-net-cdc-ether=y
+CONFIG_PACKAGE_kmod-usb-net-cdc-mbim=y
+CONFIG_PACKAGE_kmod-usb-net-cdc-ncm=y
+CONFIG_PACKAGE_kmod-usb-net-cdc-subset=y
+# CONFIG_PACKAGE_kmod-usb-net-dm9601-ether is not set
+# CONFIG_PACKAGE_kmod-usb-net-hso is not set
+CONFIG_PACKAGE_kmod-usb-net-huawei-cdc-ncm=y
+# CONFIG_PACKAGE_kmod-usb-net-ipheth is not set
+# CONFIG_PACKAGE_kmod-usb-net-kalmia is not set
+# CONFIG_PACKAGE_kmod-usb-net-kaweth is not set
+# CONFIG_PACKAGE_kmod-usb-net-mcs7830 is not set
+# CONFIG_PACKAGE_kmod-usb-net-pegasus is not set
+# CONFIG_PACKAGE_kmod-usb-net-pl is not set
+CONFIG_PACKAGE_kmod-usb-net-qmi-wwan=y
+CONFIG_PACKAGE_kmod-usb-net-rndis=y
+CONFIG_PACKAGE_kmod-usb-net-rtl8150=y
+# CONFIG_PACKAGE_kmod-usb-net-rtl8152 is not set
+CONFIG_PACKAGE_kmod-usb-net-rtl8152-vendor=y
+# CONFIG_PACKAGE_kmod-usb-net-sierrawireless is not set
+CONFIG_PACKAGE_kmod-usb-net-smsc95xx=y
+# CONFIG_PACKAGE_kmod-usb-net-sr9700 is not set
+CONFIG_PACKAGE_kmod-usb-ohci=y
+CONFIG_PACKAGE_kmod-usb-ohci-pci=y
+# CONFIG_PACKAGE_kmod-usb-printer is not set
+CONFIG_PACKAGE_kmod-usb-serial=y
+# CONFIG_PACKAGE_kmod-usb-serial-ark3116 is not set
+# CONFIG_PACKAGE_kmod-usb-serial-belkin is not set
+CONFIG_PACKAGE_kmod-usb-serial-ch341=y
+# CONFIG_PACKAGE_kmod-usb-serial-cp210x is not set
+# CONFIG_PACKAGE_kmod-usb-serial-cypress-m8 is not set
+# CONFIG_PACKAGE_kmod-usb-serial-edgeport is not set
+# CONFIG_PACKAGE_kmod-usb-serial-ftdi is not set
+# CONFIG_PACKAGE_kmod-usb-serial-garmin is not set
+# CONFIG_PACKAGE_kmod-usb-serial-ipw is not set
+# CONFIG_PACKAGE_kmod-usb-serial-keyspan is not set
+# CONFIG_PACKAGE_kmod-usb-serial-mct is not set
+# CONFIG_PACKAGE_kmod-usb-serial-mos7720 is not set
+# CONFIG_PACKAGE_kmod-usb-serial-mos7840 is not set
+CONFIG_PACKAGE_kmod-usb-serial-option=y
+# CONFIG_PACKAGE_kmod-usb-serial-oti6858 is not set
+# CONFIG_PACKAGE_kmod-usb-serial-pl2303 is not set
+# CONFIG_PACKAGE_kmod-usb-serial-qualcomm is not set
+# CONFIG_PACKAGE_kmod-usb-serial-sierrawireless is not set
+# CONFIG_PACKAGE_kmod-usb-serial-simple is not set
+# CONFIG_PACKAGE_kmod-usb-serial-ti-usb is not set
+# CONFIG_PACKAGE_kmod-usb-serial-visor is not set
+CONFIG_PACKAGE_kmod-usb-storage=y
+CONFIG_PACKAGE_kmod-usb-storage-extras=y
+CONFIG_PACKAGE_kmod-usb-storage-uas=y
+# CONFIG_PACKAGE_kmod-usb-uhci is not set
+# CONFIG_PACKAGE_kmod-usb-wdm is not set
+# CONFIG_PACKAGE_kmod-usb-yealink is not set
+CONFIG_PACKAGE_kmod-usb2=y
+CONFIG_PACKAGE_kmod-usb2-pci=y
+CONFIG_PACKAGE_kmod-usb3=y
+# CONFIG_PACKAGE_kmod-usbip is not set
+# CONFIG_PACKAGE_kmod-usbip-client is not set
+# CONFIG_PACKAGE_kmod-usbip-server is not set
+# CONFIG_PACKAGE_kmod-usbmon is not set
+# end of USB Support
