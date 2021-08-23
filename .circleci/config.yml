@@ -1,0 +1,152 @@
+version: 2
+# https://circleci.com/docs/2.0/pipeline-variables/#pipeline-parameters-in-configuration
+# https://circleci.com/docs/2.0/reusing-config/#parameter-syntax
+parameters:
+  target:
+    description: 'build/${target} to build'
+    type: enum
+    enum: ["x86_64", "N1", "rs2"]
+    default: 'x86_64'
+  config:
+    description: 'config file to build'
+    type: string
+    default: 'config.buildinfo'
+  os:
+    description: 'os to use'
+    type: string
+    default: 'ubuntu:20.04'
+
+jobs:
+  build:
+    type: approval
+    docker:
+      - image: openwrtorg/sdk:x86_64-openwrt-21.02 # ubuntu:20.04
+        auth:
+          username: mydockerhub-user
+          password: $DOCKERHUB_PASSWORD  # context / project UI env-var reference
+    # https://circleci.com/docs/2.0/executor-types/
+    # machine:
+    #   image: ubuntu-2004:202107-02 # https://circleci.com/docs/2.0/configuration-reference/#available-machine-images
+    environment:
+      REPO_URL: https://github.com/coolsnowwolf/lede
+      REPO_BRANCH: master
+      FEEDS_CONF: feeds.conf.default
+      #CONFIG_FILE: .config
+      DIY_P1_SH: diy-part1.sh
+      DIY_P2_SH: diy-part2.sh
+      DIY_AFTER: diy-after.sh
+      UPLOAD_BIN_DIR: false
+      UPLOAD_FIRMWARE: true
+      UPLOAD_COWTRANSFER: false
+      UPLOAD_WETRANSFER: false
+      UPLOAD_RELEASE: false
+      TZ: Asia/Shanghai
+      GITHUB_WORKSPACE: /home/build/project
+    steps:
+      - checkout
+      - run:
+          name: Initialization environment
+          environment:
+            DEBIAN_FRONTEND: noninteractive
+          command: |
+            sudo rm -rf /etc/apt/sources.list.d/* /usr/share/dotnet /usr/local/lib/android /opt/ghc
+            sudo -E apt-get -qq update
+            sudo -E apt-get -qq install python3-markdown procps cmake $(curl -fsSL git.io/depends-ubuntu-2004)
+            sudo -E apt-get -qq autoremove --purge
+            sudo -E apt-get -qq clean
+            sudo command -v timedatectl &>/dev/null && sudo timedatectl set-timezone "$TZ"
+            sudo mkdir -p /workdir
+            sudo chown $(id -u):$(id -g) /workdir
+      - run: 
+          name: prinf info
+          command: |
+            head /proc/1/sch*
+            df -h
+            lscpu
+            free -h
+            pwd # /home/build/project  CIRCLE_WORKING_DIRECTORY=~/project
+            ls -l . 
+            ls -l /dev/
+
+      - run:
+          name: Clone source code
+          no_output_timeout: 3m
+          command: |
+            cd /workdir
+            git clone $REPO_URL -b $REPO_BRANCH openwrt
+            \cp -a ${GITHUB_WORKSPACE}/build/r2s/* ${GITHUB_WORKSPACE}/
+            ln -sf /workdir/openwrt ${GITHUB_WORKSPACE}/openwrt
+            readlink -f ${GITHUB_WORKSPACE}/openwrt
+
+      - run:
+          name: Load custom feeds
+          no_output_timeout: 5m
+          command: |
+            [ -e $FEEDS_CONF ] && mv $FEEDS_CONF openwrt/feeds.conf.default
+            chmod +x $DIY_P1_SH
+            cd openwrt
+            ${GITHUB_WORKSPACE}/$DIY_P1_SH
+
+      - run:
+          name: Update feeds
+          no_output_timeout: 5m
+          command: |
+            cd openwrt && ./scripts/feeds update -a
+
+      - run:
+          name: Install feeds
+          no_output_timeout: 5m
+          command: |
+            cd openwrt && ./scripts/feeds install -a
+
+      - run:
+          name: Load custom configuration
+          no_output_timeout: 5m
+          command: |
+            [ -e files ] && mv files openwrt/files
+            export CONFIG=config.buildinfo #<< parameters.config >>
+            echo "use the .config file:" "${CONFIG}"
+            mv config/${CONFIG} openwrt/.config
+            chmod +x $DIY_P2_SH
+            cd openwrt
+            ${GITHUB_WORKSPACE}/$DIY_P2_SH
+
+      - run:
+          name: Download package
+          no_output_timeout: 60m
+          command: |
+            cd openwrt
+            make defconfig
+            make download -j8
+            find dl -size -1024c -exec ls -l {} \;
+            find dl -size -1024c -exec rm -f {} \;
+
+      - run:
+          name: Compile the firmware
+          no_output_timeout: 80m
+          command: |
+            cd openwrt
+            echo -e "$(nproc) thread compile"
+            make -j$(nproc) || make -j1 || make -j1 V=s
+            grep '^CONFIG_TARGET.*DEVICE.*=y' .config | sed -r 's/.*DEVICE_(.*)=y/\1/' > DEVICE_NAME
+            [ -s DEVICE_NAME ] && echo "DEVICE_NAME=_$(cat DEVICE_NAME)" >> $BASH_ENV
+            echo "FILE_DATE=_$(date +"%Y%m%d%H%M")" >> $BASH_ENV
+
+      - run:
+          name: Check space usage
+          command: |
+            df -hT
+            ls -lh openwrt/bin/targets/*/*
+
+      - run:
+          name: Do something after Compile
+          command: |
+            cd openwrt
+            if [ -f ${GITHUB_WORKSPACE}/$DIY_AFTER ];then
+              bash ${GITHUB_WORKSPACE}/$DIY_AFTER
+            fi
+
+      - store_artifacts:
+          path: openwrt/bin/targets/
+
+      

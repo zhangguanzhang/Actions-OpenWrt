@@ -8,7 +8,7 @@
 # Description: Build OpenWrt using GitHub Actions
 #
 
-name: Build OpenWrt
+name: Build OpenWrt Matrix
 
 on:
   repository_dispatch:
@@ -18,14 +18,23 @@ on:
         description: 'SSH connection to Actions'
         required: false
         default: 'false'
+      # config:
+      #   description: 'config file to build'
+      #   required: false
+      #   default: 'config.buildinfo'
+      os:
+        description: 'os to use'
+        required: false
+        default: 'ubuntu-20.04'
 
 env:
   REPO_URL: https://github.com/coolsnowwolf/lede
   REPO_BRANCH: master
   FEEDS_CONF: feeds.conf.default
-  CONFIG_FILE: .config
+  #CONFIG_FILE: .config
   DIY_P1_SH: diy-part1.sh
   DIY_P2_SH: diy-part2.sh
+  DIY_AFTER: diy-after.sh
   UPLOAD_BIN_DIR: false
   UPLOAD_FIRMWARE: true
   UPLOAD_COWTRANSFER: false
@@ -35,8 +44,15 @@ env:
 
 jobs:
   build:
-    runs-on: ubuntu-20.04
-
+    runs-on: ${{ github.event.inputs.os }}
+    name: "编译 ${{matrix.target}} - config: config.buildinfo"
+    strategy:
+      fail-fast: false
+      matrix:
+        target: 
+          - x86_64
+          - N1
+          - r2s
     steps:
     - name: Checkout
       uses: actions/checkout@main
@@ -46,6 +62,7 @@ jobs:
         df -h
         lscpu
         free -h
+        echo 'target: ${{matrix.target}}'
 
     - name: Initialization environment
       env:
@@ -53,7 +70,7 @@ jobs:
       run: |
         sudo rm -rf /etc/apt/sources.list.d/* /usr/share/dotnet /usr/local/lib/android /opt/ghc
         sudo -E apt-get -qq update
-        sudo -E apt-get -qq install $(curl -fsSL git.io/depends-ubuntu-2004)
+        sudo -E apt-get -qq install python3-markdown $(curl -fsSL git.io/depends-ubuntu-2004)
         sudo -E apt-get -qq autoremove --purge
         sudo -E apt-get -qq clean
         sudo timedatectl set-timezone "$TZ"
@@ -65,7 +82,9 @@ jobs:
       run: |
         df -hT $PWD
         git clone $REPO_URL -b $REPO_BRANCH openwrt
+        \cp -a ${GITHUB_WORKSPACE}/build/${{matrix.target}}/* ${GITHUB_WORKSPACE}/
         ln -sf /workdir/openwrt $GITHUB_WORKSPACE/openwrt
+        readlink -f $GITHUB_WORKSPACE/openwrt
 
     - name: Load custom feeds
       run: |
@@ -83,14 +102,9 @@ jobs:
     - name: Load custom configuration
       run: |
         [ -e files ] && mv files openwrt/files
-        if [ -n "${{ secrets.config }}" ];then
-          export CUSTOME_CONFIG=${{ secrets.config }}
-        else
-          ## [ -e config/$CONFIG_FILE ]
-          export CUSTOME_CONFIG=$CONFIG_FILE
-        fi
-        echo "use the .config file:" "${CUSTOME_CONFIG}"
-        mv config/${CUSTOME_CONFIG} openwrt/.config
+        export CONFIG=config.buildinfo
+        echo "use the .config file:" "${CONFIG}"
+        mv config/${CONFIG} openwrt/.config
         chmod +x $DIY_P2_SH
         cd openwrt
         $GITHUB_WORKSPACE/$DIY_P2_SH
@@ -140,14 +154,18 @@ jobs:
       if: env.UPLOAD_FIRMWARE == 'true' && !cancelled()
       run: |
         cd openwrt/bin/targets/*/*
+        pwd
         rm -rf packages
         echo "FIRMWARE=$PWD" >> $GITHUB_ENV
         echo "::set-output name=status::success"
 
-    - name: List target files
-      if: (!cancelled())
+    - name: Do something after Compile
+      if: steps.organize.outputs.status == 'success' && !cancelled()
       run: |
-        ls -lh openwrt/bin/targets/*/*
+        cd openwrt
+        if [ -f $GITHUB_WORKSPACE/$DIY_AFTER ];then
+          bash $GITHUB_WORKSPACE/$DIY_AFTER
+        fi
 
     - name: Upload firmware directory
       uses: actions/upload-artifact@main

@@ -25,5 +25,6 @@ sed -i "/timezone='CST-8'/a \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ set system.@system[-
 echo "src-git small https://github.com/kenzok8/small" >> feeds.conf.default
 echo "src-git others https://github.com/kenzok8/openwrt-packages" >> feeds.conf.default
 
-# #OpenClash
-# git clone -b master --depth 1 https://github.com/vernesong/OpenClash.git package/new/luci-app-openclash
+
+# Change default shell to bash
+sed -i 's/\/bin\/ash/\/bin\/bash/g' package/base-files/files/etc/passwd
