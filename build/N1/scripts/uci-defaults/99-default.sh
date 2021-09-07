@@ -1,18 +1,25 @@
+
 # ipk
-opkg install /*_*_*.ipk
-rm -f /*_*_*.ipk
+opkg install /root/ipks/*_*_*.ipk
+rm -f /root/ipks/*_*_*.ipk
 
-ADH_BIN=$(uci -q get AdGuardHome.AdGuardHome.binpath)
-if [ -n ${ADH_BIN} ] && [ -f /AdGuardHome ];then
-    if [ -L ${ADH_BIN} ];then
-        ADH_BIN_PATH=$(readlink -f ${ADH_BIN})
-        mkdir -p ${ADH_BIN_PATH}
-        uci -q set AdGuardHome.AdGuardHome.binpath="${ADH_BIN_PATH}/AdGuardHome"
-    fi
-    mv /AdGuardHome ${ADH_BIN}
+uci set  aliyundrive-webdav.@server[0].enable=0
+uci commit aliyundrive-webdav
+
+# uci set luci.main.mediaurlbase='/luci-static/argon_blue'
+# uci commit luci
+# 上面不生效
+sed -ri "/option mediaurlbase/s#(/luci-static/)[^']+#\1argon_blue#" /etc/config/luci
+uci commit luci
+
+if [ -f /etc/config/qbittorrent ];then
+    uci set qbittorrent.main.AnnounceToAllTrackers='true'
+    uci commit qbittorrent
 fi
 
-
-if [ -s /tmp/resolv.conf.d/resolv.conf.auto ];then
-    echo nameserver 223.5.5.5 >> /tmp/resolv.conf.d/resolv.conf.auto
-fi
+# dnsmasq
+uci set dhcp.@dnsmasq[0].rebind_protection='0'
+uci set dhcp.@dnsmasq[0].localservice='0'
+uci set dhcp.@dnsmasq[0].nonwildcard='0'
+uci set dhcp.@dnsmasq[0].server='223.5.5.5'
+uci commit dhcp

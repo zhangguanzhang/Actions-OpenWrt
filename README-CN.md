@@ -3,16 +3,18 @@
 机器最好 100G 以上
 
 ```
-docker pull docker pull openwrtorg/sdk:x86_64-openwrt-21.02
+docker pull openwrtorg/sdk:x86_64-openwrt-21.02
+
+docker run --name openwrt --rm -tid -v /root/lede/:/home/build/openwrt openwrtorg/sdk:x86_64-openwrt-21.02
+
 git clone https://github.com/coolsnowwolf/lede.git --depth 1
 cd lede
-docker run --name openwrt --rm -tid -v /root/lede/:/home/build/openwrt openwrtorg/sdk:x86_64-openwrt-21.02
-docker exec -ti -u 0 openwrt bash
+
+docker exec -ti openwrt bash
 
 echo "src-git small https://github.com/kenzok8/small" >> feeds.conf.default
 echo "src-git others https://github.com/kenzok8/openwrt-packages" >> feeds.conf.default
-echo "src-git helloworld https://github.com/fw876/helloworld " >> feeds.conf.default
-echo "src-git passwall https://github.com/xiaorouji/openwrt-passwall " >> feeds.conf.default
+
 
 
 ./scripts/feeds update -a
@@ -26,7 +28,7 @@ rm -rf package/lean/trojan
 rm -rf feeds/small/v2ray-plugin
 
 make defconfig
-
+./scripts/diffconfig.sh > seed.config
 ```
 
 ```
@@ -79,16 +81,34 @@ Xorg  --->Xorg
 4：rootfs的镜像，不带引导，可自行定义用grub或者syslinux来引导，存储区为ext4。（小白不建议）
 
 1：config.buildinfoOpenWrt --------------------------------------------------------------------------------编译配置文件
+
 2：openwrt-rockchip-armv8-friendlyarm_nanopi-r2s-ext4-sysupgrade.img.gz--------------------------Ext4 格式固件
+
 3：openwrt-rockchip-armv8-friendlyarm_nanopi-r2s-rootfs.tar.gz---------------------------------------RootFS 文件
+
 4：openwrt-rockchip-armv8-friendlyarm_nanopi-r2s-squashfs-sysupgrade.img.gz---------------------Squashfs 格式固件
+
 5：openwrt-rockchip-armv8-friendlyarm_nanopi-r2s.manifest------------------------------------------ 固件内已集成软件包列表
+
 6：packages-server.zip-------------------------------------------------------------------------------------IPK 软件包归档
+
 7：sha256sums--------------------------------------------------------------------------------------------------------固件完整性校验文件
+
 8：Source code.zip-----------------------------------------------------------------------------------------源代码.zip
+
 9：Source code(tar.gz)-------------------------------------------------------------------------------------源代码.tar.gz
+
+https://www.right.com.cn/forum/thread-3682029-1-1.html
 
 ## 参考
 - https://mlapp.cn/1009.html
 - https://www.v2rayssr.com/openwrtimg.html/comment-page-1
 - https://mianao.info/2020/05/05/%E7%BC%96%E8%AF%91%E6%9B%B4%E6%96%B0OpenWrt-PassWall%E5%92%8CSSR-plus%E6%8F%92%E4%BB%B6
+
+dnsmasq 取消 `/etc/resolv.conf` 里的 `nameserver ::1`
+```
+cat /etc/init.d/dnsmasq 
+[ -e /proc/sys/net/ipv6 ] && DNS_SERVERS="$DNS_SERVERS ::1"
+
+/etc/init.d/dnsmasq reload
+```

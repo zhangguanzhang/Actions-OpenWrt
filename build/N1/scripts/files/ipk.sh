@@ -1,6 +1,7 @@
 function download_ipk(){
     local mirror_url=https://mirrors.cloud.tencent.com/lede/snapshots/packages/aarch64_cortex-a53/packages/
-    local ipk_name=$1 dir=files/
+    local ipk_name=$1 dir=files/root/ipks/
+    mkdir -p ${dir}
     local i=0
     while [ "$i" -le 5 ];do
         ipk_name=$(curl -s ${mirror_url} | grep -Po  'href="\K'$ipk_name'_\d[^"]+')
@@ -10,9 +11,5 @@ function download_ipk(){
     wget ${mirror_url}${ipk_name} -O ${dir}${ipk_name}
 }
 
-# ps 的更多参数
-if grep -Eq '^CONFIG_PACKAGE_procps-ng=y' .config;then
-    download_ipk procps-ng-ps
-fi
+# such as: download_ipk grep
 
-download_ipk grep

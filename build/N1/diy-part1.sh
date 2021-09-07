@@ -28,3 +28,14 @@ echo "src-git others https://github.com/kenzok8/openwrt-packages" >> feeds.conf.
 
 # Change default shell to bash
 sed -i 's/\/bin\/ash/\/bin\/bash/g' package/base-files/files/etc/passwd
+
+
+# package/base-files/files/etc/init.d/boot
+# N1 安装到 emcc 打包的启动不执行初始化
+# install-to-emmc.sh install.sh
+
+SED_NUM=$(grep -nw 'for file in $files; do' package/base-files/files/etc/init.d/boot  | cut -d: -f1)
+
+echo '\t\t[ "$file" == 99-default.sh ] && [[ -f install*sh ]] && continue ' > /tmp/sed.file
+sed -i "${SED_NUM}r /tmp/sed.file" package/base-files/files/etc/init.d/boot
+# 99-default.sh 在有写入 emcc 脚本的时候不执行

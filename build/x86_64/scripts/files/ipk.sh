@@ -10,9 +10,4 @@ function download_ipk(){
     wget ${mirror_url}${ipk_name} -O ${dir}${ipk_name}
 }
 
-# ps 的更多参数
-if grep -Eq '^CONFIG_PACKAGE_procps-ng=y' .config;then
-    download_ipk procps-ng-ps
-fi
-
-download_ipk grep
+# such as: download_ipk grep
