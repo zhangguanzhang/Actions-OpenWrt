@@ -22,6 +22,10 @@ on:
         description: 'build/${target} to build'
         required: false
         default: 'x86_64'
+      n1_kernal:
+        description: 'N1 kernal'
+        required: false
+        default: ''
       config:
         description: 'config file to build'
         required: false

@@ -18,10 +18,10 @@ on:
         description: 'SSH connection to Actions'
         required: false
         default: 'false'
-      # config:
-      #   description: 'config file to build'
-      #   required: false
-      #   default: 'config.buildinfo'
+      n1_kernal:
+        description: 'N1 kernal'
+        required: false
+        default: ''
       os:
         description: 'os to use'
         required: false

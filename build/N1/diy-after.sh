@@ -11,10 +11,16 @@ mkdir -p /opt/kernel
 
 cp bin/targets/*/*/openwrt-armvirt-64-default-rootfs.tar.gz /opt/openwrt_packit/
 
+if [ -n "$n1_kernal" ];then
+    export KERNEL_VERSION=$n1_kernal
+fi
+
 # fix https://github.com/unifreq/openwrt_packit/issues/31 https://github.com/zhangguanzhang/Actions-OpenWrt/issues/1
-if grep -qw 'KERNEL_VERSION="5.14.8-flippy-65+"' /opt/openwrt_packit/make.env ;then
-    export KERNEL_VERSION='5.14.8-65+'
-    sed -ri 's#(^\s*KERNEL_VERSION=)"5.14.8-flippy-65\+"#\15.14.8-65+#' /opt/openwrt_packit/make.env
+if [ -z "$KERNEL_VERSION" ];then
+    if grep -qw 'KERNEL_VERSION="5.14.8-flippy-65+"' /opt/openwrt_packit/make.env ;then
+        export KERNEL_VERSION='5.14.8-65+'
+        #sed -ri 's#(^\s*KERNEL_VERSION=)"5.14.8-flippy-65\+"#\15.14.8-65+#' /opt/openwrt_packit/make.env
+    fi
 fi
 # 下面的 mk_s905d_n1.sh 里会执行 source 它
 #source /opt/openwrt_packit/make.env
@@ -33,7 +39,7 @@ export KERNEL_VERSION=$KERNEL_VERSION
     wget ${kernel_URL}/${kernel_VER}/modules-${KERNEL_VERSION}.tar.gz
     cd /opt/openwrt_packit
     export ENABLE_WIFI_K510=1
-    sudo ./mk_s905d_n1.sh 
+    sudo -E ./mk_s905d_n1.sh 
 )
 
 mv bin/targets/*/*/config.buildinfo /opt/openwrt_packit/tmp/
