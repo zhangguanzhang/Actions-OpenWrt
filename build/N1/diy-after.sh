@@ -3,7 +3,7 @@
 oldPATH=$(pwd)
 
 sudo apt-get update && \
-   sudo apt-get install -y   btrfs-progs dosfstools uuid-runtime parted gawk wget patch xz-utils
+   sudo apt-get install -y  jq btrfs-progs dosfstools uuid-runtime parted gawk wget patch xz-utils
 
 git clone --depth 1 https://github.com/unifreq/openwrt_packit /opt/openwrt_packit
 
@@ -17,9 +17,13 @@ fi
 
 # fix https://github.com/unifreq/openwrt_packit/issues/31 https://github.com/zhangguanzhang/Actions-OpenWrt/issues/1
 if [ -z "$KERNEL_VERSION" ];then
-    if grep -qw 'KERNEL_VERSION="5.14.8-flippy-65+"' /opt/openwrt_packit/make.env ;then
-        export KERNEL_VERSION='5.14.8-65+'
-        #sed -ri 's#(^\s*KERNEL_VERSION=)"5.14.8-flippy-65\+"#\15.14.8-65+#' /opt/openwrt_packit/make.env
+    grep -Po '^\s*\KKERNEL_VERSION=\S+' /opt/openwrt_packit/make.env > /tmp/make.env
+    source /tmp/make.env
+    DOWNLOAD_KERNEL_VERSION=$(curl -s  https://api.github.com/repos/breakings/OpenWrt/git/trees/main?recursive=1 | \
+        jq -r '.tree[].path' | \
+        grep -Pom1 "^opt/kernel/${KERNEL_VERSION%%-*}/boot-\K.+?(?=.tar.gz)")
+    if [ -n "$DOWNLOAD_KERNEL_VERSION" ];then
+        export KERNEL_VERSION="$DOWNLOAD_KERNEL_VERSION"
     fi
 fi
 # 下面的 mk_s905d_n1.sh 里会执行 source 它
@@ -55,4 +59,3 @@ ls -lh bin/targets/*/*/
 #     --device=/dev/loop0p1:/dev/loop0p1 \
 #     --device=/dev/loop0p2:/dev/loop0p2 \
 #     -v $PWD/openwrt_packit:/opt/ --cap-add SYS_ADMIN ubuntu
-
