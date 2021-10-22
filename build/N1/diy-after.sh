@@ -44,6 +44,7 @@ export KERNEL_VERSION=$KERNEL_VERSION
     cd /opt/openwrt_packit
     export ENABLE_WIFI_K510=1
     sudo -E ./mk_s905d_n1.sh 
+    find -type f -size +100M -name 'openwrt*.img' -exec mv {} /opt/openwrt_packit/tmp/ \;
 )
 
 mv bin/targets/*/*/config.buildinfo /opt/openwrt_packit/tmp/
