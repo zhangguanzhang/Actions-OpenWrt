@@ -14,7 +14,9 @@
 #sed -i 's/192.168.1.1/192.168.50.5/g' package/base-files/files/bin/config_generate
 
 # Modify default theme
-sed -ri 's/luci-theme-\S+/luci-theme-argon_new/g' feeds/luci/collections/luci/Makefile
+# https://github.com/jerrykuku/luci-theme-argon/tree/18.06
+# https://github.com/kenzok8/openwrt-packages
+sed -ri 's/luci-theme-\S+/luci-theme-argonne/g' feeds/luci/collections/luci/Makefile  # feeds/luci/modules/luci-base/root/etc/config/luci
 
 
 # luci-theme-atmaterial_new
@@ -35,10 +37,12 @@ cp ${GITHUB_WORKSPACE}/scripts/uci-defaults/* files/etc/uci-defaults/
 chmod a+x files/etc/uci-defaults/*
 
 # 预处理下载相关文件，保证打包固件不用单独下载
-source ${GITHUB_WORKSPACE}/scripts/files/adh.sh
-source ${GITHUB_WORKSPACE}/scripts/files/openclash.sh
-source ${GITHUB_WORKSPACE}/scripts/files/kodexplorer.sh
-source ${GITHUB_WORKSPACE}/scripts/files/ipk.sh
+for sh_file in `ls ${GITHUB_WORKSPACE}/scripts/files/*.sh`;do
+    source $sh_file
+done
+
+# 修改banner
+echo -e " built on "$(TZ=Asia/Shanghai date '+%Y.%m.%d %H:%M') - ${GITHUB_RUN_NUMBER}"\n -----------------------------------------------------" >> package/base-files/files/etc/banner
 
 # /tmp/resolv.conf.d/resolv.conf.auto
 # mkdir -p files/tmp/resolv.conf.d/
@@ -46,3 +50,7 @@ source ${GITHUB_WORKSPACE}/scripts/files/ipk.sh
 
 
 # ---------- end -----------
+
+# https://github.com/coolsnowwolf/lede/issues/8423
+# https://github.com/coolsnowwolf/packages/pull/315 回退后删掉这三行
+sed -i 's/^\s*$[(]call\sEnsureVendoredVersion/#&/' feeds/packages/utils/dockerd/Makefile

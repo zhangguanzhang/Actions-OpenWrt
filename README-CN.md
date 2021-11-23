@@ -1,14 +1,28 @@
 ##
 
+## ci 涉及
+
+1. 第一阶段设置好第二阶段构建的并行参数：
+   1. 例如是否 n 种仓库源，例如 r2s 使用 lede 和 immortalwrt，脚本生成参数
+2. 第二阶段是构建，注意设计：
+   1. 初始化设置 action 的一些 env，作为欸后续一些 step 的执行 if 判断
+      1. 可能 依赖安装也许不同，这里可能也抽象成配置文件
+      2. 例如 sft1200 官方自己提供源码，不会执行 feeds update 和 install
+   2. 仓库源码准备，有些特殊，并不是直接拉取仓库，可能有前置行为，这里预留属性 custom_pull
+   3. 是否使用 cache 给后续构建加速，也就是缓存 build_dir，staging_dir
+
+## 构建
+
 机器最好 100G 以上
 
 ```
 docker pull openwrtorg/sdk:x86_64-openwrt-21.02
 
-docker run --name openwrt --rm -tid -v /root/lede/:/home/build/openwrt openwrtorg/sdk:x86_64-openwrt-21.02
 
 git clone https://github.com/coolsnowwolf/lede.git --depth 1
 cd lede
+
+docker run --name openwrt --rm -tid -v $PWD:/home/build/openwrt openwrtorg/sdk:x86_64-openwrt-21.02
 
 docker exec -ti openwrt bash
 
@@ -78,7 +92,7 @@ Xorg  --->Xorg
 
 3：固件文件名中带有 sysupgrade 字样的文件为升级 OpenWrt 所用的固件，无需解压 gz 文件，可直接在 Luci 面板中升级。
 
-4：rootfs的镜像，不带引导，可自行定义用grub或者syslinux来引导，存储区为ext4。（小白不建议）
+4：rootfs的镜像，不带引导，可自行定义用 grub 或者 syslinux 来引导，存储区为 ext4。（小白不建议）
 
 1：config.buildinfoOpenWrt --------------------------------------------------------------------------------编译配置文件
 
@@ -112,3 +126,8 @@ cat /etc/init.d/dnsmasq
 
 /etc/init.d/dnsmasq reload
 ```
+
+https://www.youtube.com/watch?v=35ImdukpmyY
+
+
+https://openwrt.org/zh/docs/guide-user/additional-software/imagebuilder

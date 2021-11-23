@@ -41,6 +41,8 @@ env:
   UPLOAD_WETRANSFER: false
   UPLOAD_RELEASE: false
   TZ: Asia/Shanghai
+  DOCKER_PASS: ${{ secrets.DOCKER_PASS }} 
+  NOT_PUSH: ${{ secrets.NOT_PUSH }}
 
 jobs:
   build:
@@ -51,8 +53,8 @@ jobs:
       matrix:
         target: 
           - x86_64
-          - N1
-          - r2s
+          # - N1
+          # - r2s
     steps:
     - name: Checkout
       uses: actions/checkout@main
@@ -82,7 +84,7 @@ jobs:
       run: |
         df -hT $PWD
         git clone $REPO_URL -b $REPO_BRANCH openwrt
-        \cp -a ${GITHUB_WORKSPACE}/build/${{matrix.target}}/* ${GITHUB_WORKSPACE}/
+        \cp -a ${GITHUB_WORKSPACE}/build/${{matrix.target}}/* ${GITHUB_WORKSPACE}/build/common.buildinfo ${GITHUB_WORKSPACE}/
         ln -sf /workdir/openwrt $GITHUB_WORKSPACE/openwrt
         readlink -f $GITHUB_WORKSPACE/openwrt
 

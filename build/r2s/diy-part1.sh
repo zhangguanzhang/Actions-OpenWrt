@@ -10,7 +10,8 @@
 # Description: OpenWrt DIY script part 1 (Before Update feeds)
 #
 
-#sed -i 's/192.168.1.1/192.168.100.254/g' package/base-files/files/bin/config_generate
+sed -i 's/192.168.1.1/192.168.2.1/g' package/base-files/files/bin/config_generate
+
 sed -i "s/timezone='UTC'/timezone='CST-8'/" package/base-files/files/bin/config_generate
 sed -i "/timezone='CST-8'/a \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ set system.@system[-1].zonename='Asia/Shanghai'" package/base-files/files/bin/config_generate
 
@@ -28,3 +29,17 @@ echo "src-git others https://github.com/kenzok8/openwrt-packages" >> feeds.conf.
 
 # Change default shell to bash
 sed -i 's/\/bin\/ash/\/bin\/bash/g' package/base-files/files/etc/passwd
+
+# Clone community packages to package/community
+mkdir package/community
+pushd package/community
+
+# Add luci-app-oled (R2S Only)
+git clone --depth=1 https://github.com/NateLol/luci-app-oled
+# enable r2s oled plugin by default
+sed -ri "s/enable\s+'0'/enable '1'/" luci-app-oled/root/etc/config/oled
+# https://github.com/NateLol/luci-app-oled/issues/21 解决中文问题
+[ -d luci-app-oled/po/zh_Hans ] && mv luci-app-oled/po/zh_Hans luci-app-oled/po/zh-cn
+popd
+
+true

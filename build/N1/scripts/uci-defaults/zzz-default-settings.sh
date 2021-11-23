@@ -23,3 +23,7 @@ uci set dhcp.@dnsmasq[0].localservice='0'
 uci set dhcp.@dnsmasq[0].nonwildcard='0'
 uci set dhcp.@dnsmasq[0].server='223.5.5.5'
 uci commit dhcp
+
+
+uci add_list system.ntp.server=120.25.115.20
+uci commit system
