@@ -38,9 +38,20 @@ mkdir -p files/root/
 echo 'set paste' >> files/root/.vimrc
 
 # 预处理下载相关文件，保证打包固件不用单独下载
-source ${GITHUB_WORKSPACE}/scripts/files/adh.sh
-source ${GITHUB_WORKSPACE}/scripts/files/openclash.sh
-source ${GITHUB_WORKSPACE}/scripts/files/pwmfan.sh
+# source ${GITHUB_WORKSPACE}/scripts/files/adh.sh
+# source ${GITHUB_WORKSPACE}/scripts/files/openclash.sh
+# source ${GITHUB_WORKSPACE}/scripts/files/pwmfan.sh
+
+for sh_file in `ls ${GITHUB_WORKSPACE}/scripts/files/*.sh`;do
+    source $sh_file
+done
+
+
+chmod a+x ${GITHUB_WORKSPACE}/build/scripts/*.sh
+\cp -a ${GITHUB_WORKSPACE}/build/scripts/update.sh files/
+
+# 修改banner
+echo -e " built on "$(date +%Y.%m.%d)"\n -----------------------------------------------------" >> package/base-files/files/etc/banner
 
 # /tmp/resolv.conf.d/resolv.conf.auto
 # mkdir -p files/tmp/resolv.conf.d/
@@ -48,3 +59,7 @@ source ${GITHUB_WORKSPACE}/scripts/files/pwmfan.sh
 
 
 # ---------- end -----------
+
+if [ -n "${DOCKER_PASS}" ];then
+    docker login -u zhangguanzhang -p ${DOCKER_PASS}
+fi

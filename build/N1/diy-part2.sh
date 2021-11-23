@@ -48,10 +48,13 @@ cp ${GITHUB_WORKSPACE}/scripts/uci-defaults/* files/etc/uci-defaults/
 chmod a+x files/etc/uci-defaults/*
 
 # 预处理下载相关文件，保证打包固件不用单独下载
-source ${GITHUB_WORKSPACE}/scripts/files/adh.sh
-source ${GITHUB_WORKSPACE}/scripts/files/openclash.sh
-source ${GITHUB_WORKSPACE}/scripts/files/kodexplorer.sh
-source ${GITHUB_WORKSPACE}/scripts/files/ipk.sh
+source ${GITHUB_WORKSPACE}/scripts/files/*.sh
+# source ${GITHUB_WORKSPACE}/scripts/files/openclash.sh
+# source ${GITHUB_WORKSPACE}/scripts/files/kodexplorer.sh
+# source ${GITHUB_WORKSPACE}/scripts/files/ipk.sh
+
+# 修改banner
+echo -e " built on "$(date +%Y.%m.%d)"\n -----------------------------------------------------" >> package/base-files/files/etc/banner
 
 # /tmp/resolv.conf.d/resolv.conf.auto
 #echo nameserver 223.5.5.5 >> files/tmp/resolv.conf.d/resolv.conf.auto

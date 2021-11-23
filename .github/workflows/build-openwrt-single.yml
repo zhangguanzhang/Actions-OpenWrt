@@ -49,6 +49,7 @@ env:
   UPLOAD_WETRANSFER: false
   UPLOAD_RELEASE: false
   TZ: Asia/Shanghai
+  DOCKER_PASS: ${{ secrets.DOCKER_PASS }} 
 
 jobs:
   build:
@@ -63,6 +64,9 @@ jobs:
     - name: Checkout
       uses: actions/checkout@main
 
+    - name: install docker
+      uses: docker-practice/actions-setup-docker@master
+      
     - name: prinf info
       run: |
         df -h

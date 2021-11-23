@@ -41,6 +41,7 @@ env:
   UPLOAD_WETRANSFER: false
   UPLOAD_RELEASE: false
   TZ: Asia/Shanghai
+  DOCKER_PASS: ${{ secrets.DOCKER_PASS }} 
 
 jobs:
   build:

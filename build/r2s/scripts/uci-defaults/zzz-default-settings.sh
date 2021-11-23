@@ -28,7 +28,7 @@ uci commit dropbear
 # 二级路由的话放行上层的  CIDR 即可
 cat >> /etc/firewall.user << EOF
 # 允许wan口指定网段访问，一般二级路由下需要
-# iptables -I input_wan_rule -s 192.168.0.0/16  -j ACCEPT
+iptables -I input_wan_rule -s 192.168.0.0/16  -j ACCEPT
 EOF
 
 # dnsmasq
