@@ -5,10 +5,14 @@
 set -e
 
 # FSTYPE=ext4,squashfs
-: ${SKIP_BACK:=false}
+
+: ${SKIP_BACK:=false} ${DEBUG:=false}
 : ${TEST:=false} # 默认使用 main 分支编译的，test分支是测试阶段
 : ${USER_FILE:=/opt/openwrt.img.gz} # 用户本地升级的固件文件路径，是压缩包
 # 用户可以声明上面文件路径来本地不联网升级
+
+
+
 # 必须 /tmp 目录里操作
 WORK_DIR=/tmp/update
 IMG_FILE=openwrt.img
@@ -19,20 +23,27 @@ readonly CUR_DIR=$(cd $(dirname ${BASH_SOURCE:-$0}); pwd)
 
 
 err() {
-  printf '%b\n' "\033[1;31m[ERROR] $@\033[0m"
-  exit 1
+    printf '%b\n' "\033[1;31m[ERROR] $@\033[0m"
+    exit 1
 } >&2
 
 info() {
-  printf '%b\n' "\033[1;32m[INFO] $@\033[0m"
+    printf '%b\n' "\033[1;32m[INFO] $@\033[0m"
 }
 
 success() {
-  printf '%b\n' "\033[1;32m[SUCCESS] $@\033[0m"
+    printf '%b\n' "\033[1;32m[SUCCESS] $@\033[0m"
 }
 
 warning(){
-  printf '%b\n' "\033[1;91m[WARNING] $@\033[0m"
+    printf '%b\n' "\033[1;91m[WARNING] $@\033[0m"
+}
+
+debug(){
+    if [ "$DEBUG" != false ];then
+        printf '%b\n' "\033[1;91m[DEBUG] $@\033[0m"
+        $@
+    fi
 }
 
 function proceed_command() {
@@ -62,8 +73,8 @@ function r2s(){
         wget -NP /tmp https://ghproxy.com/https://raw.githubusercontent.com/klever1988/nanopi-openwrt/zstd-bin/ddnz
         chmod +x /tmp/ddnz
     fi
-
-    mount -t tmpfs -o remount,size=860m tmpfs /tmp
+    debug df -h
+    mount -t tmpfs -o remount,size=870m tmpfs /tmp
     [ ! -d /sys/block/$block_device ] && block_device='mmcblk1'
     [ "$board_id" = 'x86' ] && block_device='sda'
     bs=`expr $(cat /sys/block/$block_device/size) \* 512`
@@ -83,11 +94,12 @@ function r2s(){
             fi
         fi
         if [ ! -f "${USER_FILE}" ];then
+            info "开始从 dockerhub 下载包含固件的 docker 镜像，镜像名: zhangguanzhang/r2s:${VER}"
             docker pull zhangguanzhang/r2s:${VER}
             CTR_PATH=`docker run --rm zhangguanzhang/r2s:${VER} sh -c 'ls /openwrt*r2s*'`
             # openwrt-rockchip-armv8-friendlyarm_nanopi-r2s-ext4-sysupgrade.img.gz
             # openwrt-rockchip-armv8-friendlyarm_nanopi-r2s-squashfs-sysupgrade.img.gz
-            info "开始从 docker 镜像里提取和解压固件文件到: ${USER_FILE}, 请耐心等待或者开另一个ssh窗口执行命令观察进度: ls -lh ${USER_FILE}.gz"
+            info "开始从 docker 镜像里提取固件的 tag.gz 文件到: ${USER_FILE}"
             docker create --name update zhangguanzhang/r2s:${VER}
             docker cp update:${CTR_PATH} ${USER_FILE}
             docker rm update
@@ -96,6 +108,7 @@ function r2s(){
     if [ -f "${USER_FILE}" ] && [ ! -f "${USE_FILE}" ];then
         info "开始解压 ${USER_FILE} 到 ${USE_FILE}"
         gzip -dc ${USER_FILE} > ${USE_FILE} || true
+        debug ls -lh ${WORK_DIR}
         success "解压固件文件到: ${USE_FILE}"
     fi 
     truncate -s $bs $USE_FILE
@@ -109,8 +122,10 @@ function r2s(){
         mount -t ext4 ${lodev}p2 /mnt/img
         success '解压已完成，准备编辑镜像文件，写入备份信息'
         sleep 1
+        debug df -h
         sysupgrade -b back.tar.gz
         tar zmxf back.tar.gz -C /mnt/img # -m 忽略时间戳的警告
+        debug df -h
         if ! grep -q macaddr /etc/config/network; then
             warning '注意：由于已知的问题，“网络接口”配置无法继承，重启后需要重新设置WAN拨号和LAN网段信息'
             rm /mnt/img/etc/config/network;
@@ -142,10 +157,22 @@ function r2s(){
     fi
 }
 
+function opkgUpdate(){
+    local domain http_code
+
+    domain=$(grep -Ev '^\s*$|^\s*#' /etc/opkg/*.conf  | awk '{print $3}' | grep -Eo 'https?://[^/]+' | uniq | head -n1)
+    http_code=$(curl --write-out '%{http_code}' --silent --output /dev/null $domain 2>/dev/null || echo 000)
+    # 可联网下并且 /etc/opkg 的 mtime 大于 20 分钟则 opkg update
+    if [ "$http_code" != 000 ] && [[ $(( $(date +%s) - $(date +%s -r /etc/opkg ) )) -ge 1200 ]];then
+        opkg update || true
+        touch -m /etc/opkg
+    fi
+}
+
 function main(){
-    opkg update || true
+    opkgUpdate
     if [ -z "${FSTYPE}" ] && [ ! -f "${USER_FILE}" ] ;then
-        LOCAL_FSTYPE=$(findmnt / -no FSTYPE 2>/dev/null || false)
+        LOCAL_FSTYPE=$(findmnt / -no FSTYPE 2>/dev/null)
         [ -z "${LOCAL_FSTYPE}" ] && LOCAL_FSTYPE=ext4
         case "${LOCAL_FSTYPE}" in
             'overlay')
