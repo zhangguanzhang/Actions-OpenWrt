@@ -92,7 +92,7 @@ if [ -d luci-app-adguardhome ];then
     # 依赖问题，固件自带了 wget ca-bundle ca-certificates
     sed -ri '/^LUCI_DEPENDS:=/s#\+(ca-certs|wget-ssl)##g' luci-app-adguardhome/Makefile
 fi
-if [ -d adguardhome -a ! -f 'adguardhome/files//AdGuardHome' ];then
+if [ -d adguardhome -a ! -f 'adguardhome/files/AdGuardHome' ];then
     wget  https://static.adguard.com/adguardhome/release/AdGuardHome_linux_mipsle_softfloat.tar.gz -O - | \
       tar -zxvf -  --strip-components 2 -C adguardhome/files/ ./AdGuardHome/AdGuardHome 
     upx -9 adguardhome/files/AdGuardHome

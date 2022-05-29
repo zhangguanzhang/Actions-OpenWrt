@@ -2,6 +2,9 @@
 
 repo_name=$1
 target=$2
+if [ "$target" = '-full' ];then
+    target=''
+fi
 
 function upload_dockerhub(){
 
