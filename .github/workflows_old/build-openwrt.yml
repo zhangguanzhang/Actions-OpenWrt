@@ -18,10 +18,6 @@ on:
         description: 'SSH connection to Actions'
         required: false
         default: 'false'
-      n1_kernal:
-        description: 'N1 kernal'
-        required: false
-        default: ''
       os:
         description: 'os to use'
         required: false
@@ -53,8 +49,6 @@ jobs:
       matrix:
         target: 
           - x86_64
-          # - N1
-          # - r2s
     steps:
     - name: Checkout
       uses: actions/checkout@main

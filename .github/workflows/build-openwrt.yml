@@ -8,7 +8,7 @@
 # Description: Build OpenWrt using GitHub Actions
 #
 
-name: Build OpenWrt Single
+name: Build OpenWrt
 
 on:
   repository_dispatch:
@@ -101,6 +101,7 @@ jobs:
       
     - name: prinf machine info and matrix info
       run: |
+        uname -a
         df -h
         lscpu
         free -h
@@ -137,12 +138,19 @@ jobs:
             find gh_* -type f -name gh -exec mv {} /usr/local/bin/ \;
             rm -rf gh_*linux*
             sudo chmod a+x /usr/local/bin/gh
-            gh auth login --with-token <<< ${{ secrets.gh_token }}
+            echo ${{ secrets.gh_token }} | gh auth login --with-token
           fi
           if command -v docker &>/dev/null && [ -n "${DOCKER_PASS}" ];then
             docker login -u ${{ github.repository_owner }} -p ${DOCKER_PASS}
           fi
         fi
+
+        git clone https://github.com/openwrt-dev/po2lmo.git
+        pushd po2lmo
+        make && sudo make install
+        popd
+        rm -rf po2lmo
+        
         # 设置一些 condition 给后续步骤作为判断条件或者执行的值
         # 以及一些 shell
         bash env.sh
@@ -272,6 +280,7 @@ jobs:
         
         # 开启 imagebuilder 的话 保留一个.config.bak 给非 slim 使用
         if grep -Eq '^CONFIG_IB=y' .config;then
+          echo 'MAKE_OPTS=IGNORE_ERRORS=1' >> $GITHUB_ENV
           if [ "$NO_CACHE" != 1 ];then
             mv .config config.slim
             cat config.buildinfo > .config
@@ -286,6 +295,8 @@ jobs:
             sed -ri '/^CONFIG_PACKAGE_luci-app-[0-9a-z-]+=y/{s@^@# @;s@=y@ is not set@}' .config
             make defconfig
           fi
+        else
+          echo 'MAKE_OPTS=' >> $GITHUB_ENV
         fi
 
         if [ "$MakeDownload" == true ];then
@@ -317,17 +328,18 @@ jobs:
       run: |
         cd openwrt
         echo -e "$(nproc) thread compile"
-        if [ "${AutoBuildTimeOut}" == true ] ;then
+        if [ -n "${{ secrets.gh_token }}" ] && [ "${AutoBuildTimeOut}" == true ] ;then
           createdAt=$(gh -R ${GITHUB_REPOSITORY}  run list --json databaseId,createdAt --jq ".[]|select(.databaseId==${{ github.run_id }})|.createdAt")
           usedSec=$(( `date +%s` - `date -d "$createdAt" +%s`  ))
           # 6小时超时，减去上传 cache 预留的 10 分钟后的时间作为 timeout 时间
           timeoutSec=$(( 6*60*60 - 10*60 - $usedSec  ))
           # 初次没缓存用 timeout 后防止超时 action ，后面会上传缓存目录
-                # time make -j$(nproc) IGNORE_ERRORS=1 || make -j1 IGNORE_ERRORS=1 || make -j1 V=s IGNORE_ERRORS=1
-          echo timeout $timeoutSec make -j$(nproc) IGNORE_ERRORS=1
-          timeout $timeoutSec make -j$(nproc) IGNORE_ERRORS=1
-          # timeout 超时是 124 返回码
-          if [ $? -ne 0 -a $? -ne 124 ];then
+          echo timeout $timeoutSec make -j$(nproc) $MAKE_OPTS
+          timeout $timeoutSec make -j$(nproc) $MAKE_OPTS |& tee -a /tmp/build.log
+          # timeout 超时是 124 返回码，这里直接关键字匹配做详细信息的 make
+          echo "timeout make exitcode: $makeExit"
+          if grep -qw 're-run make' /tmp/build.log;then
+            echo 'failed: try to V=s'
             make -j1 || make -j1 V=s
           fi
         else
@@ -572,7 +584,7 @@ jobs:
           mkdir -p files/local_feed && sudo mount --bind packages files/local_feed
           echo "suffix=-slim" >> $GITHUB_ENV
         else
-          echo "suffix=" >> $GITHUB_ENV
+          echo "suffix=-full" >> $GITHUB_ENV
         fi
 
         sed -i 's/luci-app-[^ ]*//g' include/target.mk $(find target/ -name Makefile)
