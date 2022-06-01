@@ -61,4 +61,4 @@ chmod a+x ${GITHUB_WORKSPACE}/build/scripts/*.sh
 \cp -a ${GITHUB_WORKSPACE}/build/scripts/update.sh files/
 
 # 修改banner
-echo -e " built on "$(TZ=Asia/Shanghai date '+%Y.%m.%d %H:%M') - ${GITHUB_RUN_NUMBER}"\n -----------------------------------------------------" >> package/base-files/files/etc/banner
+echo -e " zgz built on "$(TZ=Asia/Shanghai date '+%Y.%m.%d %H:%M') - ${GITHUB_RUN_NUMBER}"\n -----------------------------------------------------" >> package/base-files/files/etc/banner

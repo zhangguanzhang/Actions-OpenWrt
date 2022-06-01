@@ -62,7 +62,7 @@ function proceed_command() {
     local install=$1
     [ -n "$2" ] && install=$2
 	if ! command -v $1 &> /dev/null; then
-        if [ "$NO_NET" = true ];then
+        if [ -n "$NO_NET" ];then
             err "检测到无法联网，并且固件没有扩容所需命令: $1"
         fi
         opkg install --force-overwrite $install
@@ -80,11 +80,40 @@ function init_d_stop(){
         fi
     done 
 }
+function download(){
+    local img=$1
+    local fsType=$2
+    local isTest=$3
+
+}
+
+function EnsureDockerStart(){
+    local i=0
+    while true;do
+        if [ "$i" -eq 0 ];then
+            /etc/init.d/dockerd start
+            i=1
+        fi
+        if docker info --format '{{.DockerRootDir}}' &>/dev/null;then
+            break
+        fi
+        sleep 2
+    done
+}
 
 # TODO
 # 从 ghproxy 下载
-function registry_api_setting(){
-    local target=$1 realm service scope url
+function ghproxy_download_op(){
+    true
+}
+
+# 阿里云镜像仓库下载
+function registry_blob_download_op(){
+    # target=r2s
+    # tag=latest-squashfs-slim-lede-master
+    local target=$1 tag=$2 url regirey_header blob_id
+    # https://stackoverflow.com/questions/71409458/how-to-download-docker-image-using-http-api-using-docker-hub-credentials
+
     curl -L https://${repo_domain}/v2/${repo_namespace}/${target}/tags/list -v 2>&1 | awk '/Www-Authenticate/{print $4}' | sed 's/,/\n/g' > /tmp/registr_realm
     source /tmp/registr_realm
     url="${realm}?service=${service}&scope=${scope}"
@@ -92,125 +121,91 @@ function registry_api_setting(){
     url=${url%$'\r'}
     curl -sL "${url}" > /tmp/registr_token
     regirey_header="Authorization: Bearer `jsonfilter -e '@["token"]' < /tmp/registr_token`"
-}
-
-function registry_tag_list(){
-    local target=$1 
-    [ -z "$regirey_header" ] && registry_api_setting $target
-    # curl -s  https://hub.docker.com/v2/repositories/zhangguanzhang/${$board_id}/tags/?page_size=100
-    # 阿里的仓库不支持 /tags/?page_size=100
-    curl -sL -H "${regirey_header}"  https://${repo_domain}/v2/${repo_namespace}/${target}/tags/list?page_size=100 
-}
-
-# 阿里云镜像仓库下载
-function registry_blob_download_op(){
-    # target=r2s
-    # tag=latest-squashfs-slim-lede-master
-    local target=$1 tag=$2 url blob_id
-    # https://stackoverflow.com/questions/71409458/how-to-download-docker-image-using-http-api-using-docker-hub-credentials
-
-    [ -z "$regirey_header" ] && registry_api_setting $target
 
     curl -sL https://${repo_domain}/v2/${repo_namespace}/${target}/manifests/${tag} -H "${regirey_header}" > /tmp/registr_manifest.json
     blob_id=$(jsonfilter -e '@["fsLayers"][0]["blobSum"]' < /tmp/registr_manifest.json)
     info "开始从 ${docker_repo_ns} 下载包含 $target $tag 固件的 blob 数据，左下角数据是下载进度百分比"
-    # TODO
-    # 直接下载和解压
     curl -L https://${repo_domain}/v2/${repo_namespace}/${target}/blobs/${blob_id} -H "${regirey_header}" -o ${USER_FILE}.tar.gz
+    cd ${tmp_mountpoint}
+    tar zxf ${USER_FILE}.tar.gz
+    rm -f ${USER_FILE}.tar.gz
+    mv *${target}* ${USER_FILE}
+    mv sha256sums /tmp/
     rm -f /tmp/registr_*
 }
 
-# function docker_download_op(){
-#     local img_name=$1
-#     info "开始从 dockerhub 下载包含固件的 docker 镜像，如果拉取失败，可以自己手动 docker pull ${img_name}"
-#     docker pull ${img_name}
-#     CTR_PATH=$( docker inspect ${img_name} --format '{{ .Config.Labels }}' | grep -Eo 'openwrt-.+img.gz' )
-#     info "开始从 docker 镜像里提取固件的 tar.gz 压缩文件到: ${USER_FILE}"
-#     docker create --name update ${img_name}
-#     docker cp update:/${CTR_PATH} ${USER_FILE}
-#     docker cp update:/sha256sums /tmp/
-#     docker rm update
-#     IMG_EXIST=1
-# }
+function docker_download_op(){
+    local img_name=$1
+    info "开始从 dockerhub 下载包含固件的 docker 镜像，如果拉取失败，可以自己手动 docker pull ${img_name}"
+    docker pull ${img_name}
+    CTR_PATH=$( docker inspect ${img_name} --format '{{ .Config.Labels }}' | grep -Eo 'openwrt-.+img.gz' )
+    info "开始从 docker 镜像里提取固件的 tar.gz 压缩文件到: ${USER_FILE}"
+    docker create --name update ${img_name}
+    docker cp update:/${CTR_PATH} ${USER_FILE}
+    docker cp update:/sha256sums /tmp/
+    docker rm update
+    IMG_EXIST=1
+}
 
 function r2s(){
-    part_prefix=p
-    tmp_mountpoint_end_size=2600MB
-    first_grow_condition_size=1800
-    blob_layer_reg_str=r2s
-    # [ ! -d /sys/block/$block_device ] && block_device='mmcblk1'
-    update
-}
-
-function x86_64(){
-    part_prefix=''
-    tmp_mountpoint_end_size=2400MB
-    first_grow_condition_size=1500
-    blob_layer_reg_str=x86-64
-    update
-}
-
-function update(){
+    local block_device='mmcblk0'
+    local bs part_num NEED_GROW
+    proceed_command parted
+    proceed_command losetup
+    proceed_command resize2fs
+    proceed_command truncate coreutils-truncate
+    proceed_command curl
+    proceed_command wget
+    # [ -f /usr/bin/ddnz ] && cp /usr/bin/ddnz /tmp/
+    # if [ ! -f /tmp/ddnz ]; then 
+    #     wget -NP /tmp https://ghproxy.com/https://raw.githubusercontent.com/klever1988/nanopi-openwrt/zstd-bin/ddnz
+    #     chmod +x /tmp/ddnz
+    # fi
     debug df -h
     mount -t tmpfs -o remount,size=100% tmpfs /tmp
+    [ ! -d /sys/block/$block_device ] && block_device='mmcblk1'
+    [ "$board_id" = 'x86' ] && block_device='sda'
     bs=`expr $(cat /sys/block/$block_device/size) \* 512`
 
     mkdir -p ${WORK_DIR}
     cd ${WORK_DIR}
 
     [ ! -d ${tmp_mountpoint} ] && mkdir -p ${tmp_mountpoint}
-    if [ $(df  -m ${tmp_mountpoint} | awk 'NR==2{print $4}') -lt "$first_grow_condition_size" ];then
+    if [ $(df  -m ${tmp_mountpoint} | awk 'NR==2{print $4}') -lt 2400 ];then
         NEED_GROW=1
         init_d_stop dockerd
-        warning "检测到当前未扩容，先创建一个分区挂载为 ${tmp_mountpoint} 数据目录用于存放升级固件"
+        warning "检测到当前未扩容，先创建一个分区挂载为 ${tmp_mountpoint} 数据目录"
         df -h
-        rm -f /tmp/parted_info
-        parted --script /dev/$block_device p 2>&1 | tee -a /tmp/parted_info
-        # gpt 扩容警告
-        if grep -Eq 'fix the GPT' /tmp/parted_info;then
-            echo -e "OK\nFix\n" | parted ---pretend-input-tty /dev/$block_device print 1>/dev/null
-            rm -f /tmp/parted_info
-        fi
+        parted /dev/$block_device p
         # 分区后在升级前报错，此处提前记录
-        #p_4g_num=$(parted --script /dev/$block_device p | awk '$1~/[1-9]/&& $3=="'${tmp_mountpoint_end_size}'"{print $1}')
-        unset part_num
-        part_num=$(parted --script /dev/$block_device p | awk '$1~/[1-9]/&& $3=="'${tmp_mountpoint_end_size}'"{print $1}')
-
-        if [ -z "${part_num}" ];then
+        p_4g_num=$(parted /dev/mmcblk0 p | awk '$1~/[1-9]/&& $3=="4000MB"{print $1}')
+        [ -n "$p_4g_num" ] && echo $p_4g_num > /root/.parted
+        if [ ! -f '/root/.parted' ];then
             start_sec=$(parted /dev/$block_device unit s print free | awk '$1~"s"{a=$1}END{print a}')
-            align_size=$(parted /dev/$block_device align-check optimal 2 | awk '$2!="aligned"{print +$6}')
-            if [ -n "$align_size" ];then
-                start_sec_align=$(expr $(echo $start_sec | sed 's/s//') / $align_size )
-                start_sec_align=$(expr $start_sec_align \* $align_size )
-                start_sec=$(expr $start_sec_align + $align_size )s
-            fi
-            parted /dev/$block_device mkpart p ext4 ${start_sec} ${tmp_mountpoint_end_size}
-            part_num=$(parted --script /dev/$block_device p | awk '$1~/[1-9]/&& $3=="'${tmp_mountpoint_end_size}'"{print $1}')
+            parted /dev/$block_device mkpart p ext4 ${start_sec} 4G
+            part_num=$( parted /dev/$block_device p | awk '$5=="primary"{a=$1}END{print a}' )
             sleep 3 # 此处会自动挂载造成蛋疼
-            if grep -E "/dev/${block_device}${part_prefix}${part_num} " /proc/mounts;then
-                if mountpoint -q  /mnt/${block_device}${part_prefix}${part_num};then
-                    touch /mnt/${block_device}${part_prefix}${part_num}/.fs.exit &>/dev/null || true
-                    umount /mnt/${block_device}${part_prefix}${part_num}
-                    try_fsck=0
-                    while [ "$try_fsck" -le 10 ];do
-                        e2fsck -y -f /dev/${block_device}${part_prefix}${part_num} && break || true
-                        let try_fsck+1
-                    done
-                    resize2fs /dev/${block_device}${part_prefix}${part_num}
+            if grep -E /dev/${block_device}p${part_num} /proc/mounts;then
+                if mountpoint -q  /mnt/${block_device}p${part_num};then
+                    touch /mnt/${block_device}p${part_num}/test &>/dev/null || NEED_MKFS=1
+                    umount /mnt/${block_device}p${part_num}
                 fi
-                [ ! -f "${tmp_mountpoint}/.fs.exit" ] && mkfs.ext4 -F /dev/${block_device}${part_prefix}${part_num}
+                [ -n "$NEED_MKFS" ] && mkfs.ext4 -F /dev/${block_device}p${part_num}
             else
-                mkfs.ext4 -F /dev/${block_device}${part_prefix}${part_num}
+                mkfs.ext4 -F /dev/${block_device}p${part_num}
             fi
+            echo ${part_num} > /root/.parted
+        else
+            part_num=$(cat /root/.parted)
         fi
 
-        mountpoint -q  ${tmp_mountpoint} || mount -o rw /dev/${block_device}${part_prefix}${part_num} ${tmp_mountpoint}
+        mountpoint -q  ${tmp_mountpoint} || mount -o rw /dev/${block_device}p${part_num} ${tmp_mountpoint}
 
-        if mountpoint -q  /mnt/${block_device}${part_prefix}${part_num};then
-            umount /mnt/${block_device}${part_prefix}${part_num}
+        if mountpoint -q  /mnt/${block_device}p${part_num};then
+            umount /mnt/${block_device}p${part_num}
         fi
-        if mountpoint -q  /mnt/${block_device}${part_prefix}1;then
-            umount /mnt/${block_device}${part_prefix}1
+        if mountpoint -q  /mnt/${block_device}p1;then
+            umount /mnt/${block_device}p1
         fi
 
 
@@ -230,35 +225,19 @@ function update(){
         if [ "${TEST}" != false ];then
             IMG_TAG=latest-${FSTYPE}${VER}-${REPO}-${IM_BRANCH}
         else
-            # dockerhub jsonfilter -e '@["results"][*].name'
-            IMG_TAG=$(registry_tag_list ${board_id}  | \
-                jsonfilter -e '@["tags"][*]' | grep -E release | sort -rn | head -n1)
+            IMG_TAG=$(curl -s  https://hub.docker.com/v2/repositories/zhangguanzhang/r2s/tags/?page_size=100 | \
+                jsonfilter -e '@["results"][*].name' | grep -E release | sort -rn | head -n1)
         fi
         # 没合并到 master 上暂时使用测试固件
         [ -z "${IMG_TAG}" ] && IMG_TAG=latest-${FSTYPE}${VER}-${REPO}-${IM_BRANCH}
 
         if [ ! -f "${USER_FILE}" ];then
-            if [ ! -f  ${USER_FILE}.tar.gz ];then
-                registry_blob_download_op ${board_id} ${IMG_TAG}
-            fi
-            cd ${tmp_mountpoint}
-            info "下载完成，开始解压 blob layer"
-            tar zxf ${USER_FILE}.tar.gz
-            rm -f ${USER_FILE}.tar.gz
-            # x86-64 是 img 结尾，其余的是 img.gz
-            if ls *${blob_layer_reg_str}* | grep -Eq 'img$';then
-                # 不再继续解压
-                mv *${blob_layer_reg_str}* ${USE_FILE}
-                check_file=$USE_FILE
-            else
-                mv *${blob_layer_reg_str}* ${USER_FILE}
-            fi
-            mv sha256sums /tmp/
+            #docker_download_op registry.aliyuncs.com/zhangguanzhang/r2s:${IMG_TAG}
+            registry_blob_download_op r2s ${IMG_TAG}
         fi
     fi
     if [ -f /tmp/sha256sums ];then
-        [ -z "$check_file" ] && check_file=$USER_FILE
-        file_sum=`sha256sum ${check_file} | awk '{print $1}'`
+        file_sum=`sha256sum ${USER_FILE} | awk '{print $1}'`
         if ! grep -Eq "${file_sum}" /tmp/sha256sums;then
             rm -f ${USER_FILE}
             err '文件校验失败，文件可能损坏，请再次重试'
@@ -273,13 +252,6 @@ function update(){
     fi
     
     truncate -s $bs $USE_FILE
-    rm -f /tmp/parted_info
-    parted --script $USE_FILE p 2>&1 | tee -a /tmp/parted_info
-    # gpt 扩容警告
-    if grep -Eq 'fix the GPT' /tmp/parted_info;then
-        echo -e "OK\nFix\n" | parted ---pretend-input-tty $USE_FILE print 1>/dev/null
-        rm -f /tmp/parted_info
-    fi
     parted $USE_FILE resizepart 2 100%
 
     part2_seek=$(parted $USE_FILE u s p | awk '$1==2{print +$2}')
@@ -320,15 +292,14 @@ function update(){
     # 无论备份不备份，都把应用列表保留到新固件的 rootfs 里
     # TODO
     # 当前主题写入
-    echo 'opkg update' > /mnt/update/img/packages_needed
     opkg list-installed | grep -E "luci-(i18n|app)-" | cut -d ' '  -f1 | \
-        sort -r | xargs -n1 echo opkg install --force-overwrite >> /mnt/update/img/packages_needed
+        sort -r | xargs -n1 echo opkg install --force-overwrite > /mnt/update/img/packages_needed
+    sed -i '1i opkg update' /mnt/update/img/packages_needed
 
     if [ "$SKIP_BACK" != false ] || [ -n "$NEED_GROW" ] ;then
         if [ -n "$NEED_GROW" ];then
             warning '注意：初版扩容，或者其他人固件升级到我的固件时候只备份网卡配置文件'
         fi
-        cp /etc/config/network /mnt/update/img/etc/config/network.bak
         cat /etc/config/network > /mnt/update/img/etc/config/network
     else
         sysupgrade -b back.tar.gz
@@ -343,11 +314,10 @@ function update(){
         rm back.tar.gz
         success '备份文件已经写入，移除挂载'
     fi
-    # 一直备份网卡配置文件
-    # if ! grep -q macaddr /etc/config/network; then
-    #     warning '注意：由于已知的问题，“网络接口”配置无法继承，重启后需要重新设置WAN拨号和LAN网段信息'
-    #     rm /mnt/update/img/etc/config/network;
-    # fi
+    if ! grep -q macaddr /etc/config/network; then
+        warning '注意：由于已知的问题，“网络接口”配置无法继承，重启后需要重新设置WAN拨号和LAN网段信息'
+        rm /mnt/update/img/etc/config/network;
+    fi
 
 
     if [ "$IMG_FSTYPE" = 'squashfs' ];then
@@ -401,6 +371,10 @@ function update(){
             -b $[sq_block_size/1024]k \
             -p '/dev d 755 0 0' -p '/dev/console c 600 0 0 5 1' \
             $xattrs -mem 20M 
+        
+        losetup -l -O NAME -n | grep -Eqw $lodev && losetup -d $lodev
+        dd if=/opt/op.squashfs of=${IMG_FILE} bs=512 seek=${part2_seek} conv=notrunc
+        rm -rf /opt/op.squashfs /mnt/update/img
     fi
 
     mountpoint -q  /mnt/update/img && umount /mnt/update/img
@@ -420,19 +394,16 @@ function update(){
         done
         resize2fs ${lodev}p2
     fi
-    if [ "$IMG_FSTYPE" = 'squashfs' ];then
-        losetup -l -O NAME -n | grep -Eqw $lodev && losetup -d $lodev
-        dd if=/opt/op.squashfs of=${IMG_FILE} bs=512 seek=${part2_seek} conv=notrunc
-        rm -rf /opt/op.squashfs /mnt/update/img
-    fi
     sleep 1
     sync
     # squashfs 可能提前 -d 了，这里判断的逻辑兼容 ext4
     losetup -l -O NAME -n | grep -Eqw $lodev && losetup -d $lodev
     sleep 1
-
+    if [ -n "$IMG_EXIST" ];then
+        docker rmi registry.aliyuncs.com/zhangguanzhang/r2s:${IMG_TAG} || true
+    fi
     [ -f "${USER_FILE}" ] && rm -f ${USER_FILE}
-
+    [ -f '/root/.parted' ] && rm -f /root/.parted
     # 后面的 umount / 前清理掉相关文件
     success '正在打包...'
     warning '开始写入，请勿中断...'
@@ -461,29 +432,13 @@ function opkgUpdate(){
                 touch -m /etc/opkg
             fi
         else
-            NO_NET=true
+            NO_NET=1
         fi
     else # slim 固件
         if grep -Eq '^\s*src.gz\s+\S+\s+file' /etc/opkg/*.conf;then
             opkg update
         fi
     fi
-}
-
-# 获取根分区所在的 block_device
-# newifi d2 固件格式的 lsblk 很奇怪，日后看看
-function auto_set_block_var(){
-    local block rootfs_part
-    rootfs_part=$(lsblk --output NAME,FSTYPE,LABEL,MOUNTPOINT | awk '($4=="/"&&tolower($3)~/rootfs/)||($2=="squashfs"&&$3=="/rom"){print $1}' | sed -r 's/[^a-zA-Z0-9]//g')
-    [ -z "$rootfs_part" ] && err "自动获取根分区所在块设备失败"
-    #for block in `ls -l /dev/ | awk '$1~/^br/&&$NF!~/loop|ram/{print $NF}'`;do
-    for block in `ls -1 /sys/block/ | grep -Ev 'loop|ram'`;do
-        if echo ${rootfs_part} | grep -Eq $block;then
-            block_device=$block
-            return
-        fi
-    done
-    err "无法在 /sys/block 里匹配到 $rootfs_part"
 }
 
 function main(){
@@ -511,32 +466,16 @@ function main(){
     fi
     [ "$VER" == full ] && VER=''
 
-    [ "$TEST" = true ] && release_name=test || release_name=latest
+    if [ "$TEST" = true ];then
+        release_name=test
+    else
+        release_name=latest
+    fi
 
     board_id=$(jsonfilter -e '@["model"].id' < /etc/board.json | \
         sed -r -e 's/friendly.*,nanopi-//' )
     arch=`uname -m`
     [ $arch == 'x86_64' ] && board_id='x86_64'
-
-    type -t $board_id 1>/dev/bull || err "暂不支持该设备: ${board_id}"
-
-    # 不存在本地文件离线升级，并且没网就退出
-    if [ ! -f "$USER_FILE" ];then
-        http_code=$(curl --write-out '%{http_code}' --silent --output /dev/null https://$repo_domain 2>/dev/null || echo 000)
-        if [ "$http_code" != 200 ];then
-            err "无法访问: ${repo_domain}，是否没有配置 wan 或者无法上网"
-        fi
-    fi
-    auto_set_block_var
-
-    proceed_command parted
-    proceed_command losetup
-    proceed_command resize2fs
-    proceed_command truncate coreutils-truncate
-    proceed_command curl
-    proceed_command wget
-    proceed_command lsblk
-
     $board_id
 }
 

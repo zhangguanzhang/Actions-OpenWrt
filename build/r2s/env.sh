@@ -16,6 +16,8 @@ function SET_ENV(){
 }
 fi
 
+SET_ENV EnableDocker true
+
 SET_ENV UdateFeeds true
 SET_ENV InstallFeeds true
 

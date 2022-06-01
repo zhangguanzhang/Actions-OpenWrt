@@ -12,8 +12,8 @@ function upload_dockerhub(){
     local BRANCH=${GITHUB_REF##*/}
     local file=$(basename $1)
     local tag=release-$(date +%Y-%m-%d)
-    local FSTYPE=${file##*r2s-}
-    FSTYPE=${FSTYPE%-*}
+    # x86_64 只有 squashfs
+    local FSTYPE=squashfs
 
     cp $1 ${BUILD_DIR}/
     # cp $(dirname $1)/{sha256sums,config.buildinfo,feeds.buildinfo,version.buildinfo} ${BUILD_DIR}/
@@ -31,10 +31,10 @@ EOF
 
     (
         cd ${BUILD_DIR}
-        echo docker buildx build --platform linux/arm64  -t ${build_img} --push .
-        docker buildx build --platform linux/arm64  -t ${build_img} --push .
+        echo docker buildx build --platform linux/amd64 -t ${build_img} --push .
+        docker buildx build --platform linux/amd64 -t ${build_img} --push .
         # 同步到阿里云
-        docker buildx build --platform linux/arm64  -t registry.aliyuncs.com/${build_img} --push .
+        docker buildx build --platform linux/amd64 -t registry.aliyuncs.com/${build_img} --push .
     )
     # docker push ${build_img}
     # if [ "${BRANCH}" != main ];then
@@ -50,6 +50,6 @@ function upload(){
     fi    
 }
 
-for file in $(ls $GITHUB_WORKSPACE/openwrt/bin/targets/*/*/openwrt-rockchip-armv8-friendlyarm_nanopi-r2s-*-sysupgrade.img.gz);do
+for file in $(ls $GITHUB_WORKSPACE/openwrt/bin/targets/*/*/openwrt-x86-64-generic-squashfs-combined-efi.img);do
     upload $file
 done

@@ -60,5 +60,5 @@ fi
 uci set dhcp.@dnsmasq[0].rebind_protection='0'
 uci set dhcp.@dnsmasq[0].localservice='0'
 uci set dhcp.@dnsmasq[0].nonwildcard='0'
-uci set dhcp.@dnsmasq[0].server='223.5.5.5'
+uci add_list dhcp.@dnsmasq[0].server='223.5.5.5#53'
 uci commit dhcp

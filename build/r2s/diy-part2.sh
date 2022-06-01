@@ -16,17 +16,79 @@
 # 取消默认的 autosamba 依赖的 luci-app-samba 到 slim 里
 find  ./target/linux/ -maxdepth 2 -type f  -name Makefile -exec sed -i 's#autosamba##' {} \;
 
-# ---- 前的行写入文件
-sed -n '/---/{q};p' common.buildinfo >> .config
+kernel_ver=$(grep -Po '^KERNEL_PATCHVER=\K\S+' target/linux/rockchip/Makefile)
 
-# https://github.com/coolsnowwolf/packages/issues/352
-rm -f feeds/packages/utils/dockerd/files{/etc/config/dockerd,/etc/docker/daemon.json,/etc/init.d/dockerd}
-SED_NUM=$( grep -n '^\s*/etc/config/dockerd' feeds/packages/utils/dockerd/Makefile | awk -F: '$0~":"{print $1}')
-if [ -n "$SED_NUM" ];then
-    sed -ri "$[SED_NUM-1],$[SED_NUM+1]d" feeds/packages/utils/dockerd/Makefile
+
+function merge_package(){
+    local pn=$1
+    # 删掉/和它左边，只保留名字
+    pn=${pn##*/}
+    find package/ -follow -name $pn -not -path "package/custom/*" | xargs -rt rm -rf
+    if [ ! -z "$2" ]; then
+        find package/ -follow -name $2 -not -path "package/custom/*" | xargs -rt rm -rf
+    fi
+
+    if [[ $1 == *'/trunk/'* || $1 == *'/branches/'* ]]; then
+        svn export $1
+    else
+        git clone --depth=1 --single-branch $3 $1
+        rm -rf $pn/.git
+    fi
+    mv $pn package/custom/
+}
+
+
+
+rm -rf package/custom; mkdir package/custom
+
+
+if [ "$repo_name" = 'lede' ];then
+    # https://github.com/coolsnowwolf/packages/issues/352
+    rm -f feeds/packages/utils/dockerd/files{/etc/config/dockerd,/etc/docker/daemon.json,/etc/init.d/dockerd}
+    SED_NUM=$( grep -n '^\s*/etc/config/dockerd' feeds/packages/utils/dockerd/Makefile | awk -F: '$0~":"{print $1}')
+    if [ -n "$SED_NUM" ];then
+        sed -ri "$[SED_NUM-1],$[SED_NUM+1]d" feeds/packages/utils/dockerd/Makefile
+    fi
+    sed -ri '\%/files/(daemon.json|dockerd.init|etc/config/dockerd)%d' feeds/packages/utils/dockerd/Makefile
+    sed -ri '\%\$\(INSTALL_DIR\) \$\(1\)/etc/(docker|init\.d|config)%d' feeds/packages/utils/dockerd/Makefile
+
+    # https://github.com/coolsnowwolf/lede/issues/9483
+    # https://github.com/coolsnowwolf/lede/pull/9457/files#diff-38a2e413df332b2dd0c3651ef57bd9544c2224faa0bf9fb7712daf769e12fa67L449-L470
+    # https://github.com/coolsnowwolf/lede/commit/ee7d9cff629778e16d1a34abc04ea3d6524d56bb#diff-38a2e413df332b2dd0c3651ef57bd9544c2224faa0bf9fb7712daf769e12fa67R470
+    if [ "$kernel_ver" = '5.10' ] || [ "$kernel_ver" = '5.4' ];then
+        sed -ri '/=CONFIG_CRYPTO_LIB_BLAKE2S/{n;s/HIDDEN:=1/DEPENDS:=@(LINUX_5_4||LINUX_5_10)/;}' package/kernel/linux/modules/crypto.mk
+        for SED_NUM in $( grep -En 'blake2s(|-generic|-arm).ko' package/kernel/linux/modules/crypto.mk |  awk -F: '$0~":"{print $1}');do
+            sed -ri "${SED_NUM}s#@lt5.9##" package/kernel/linux/modules/crypto.mk
+        done
+    fi
+
+    # use lastet driver of rtl8821CU
+    sed -i 's/PKG_SOURCE_VERSION:=.*/PKG_SOURCE_VERSION:=master/' package/kernel/rtl8821cu/Makefile
+    sed -i 's/PKG_MIRROR_HASH:=.*/PKG_MIRROR_HASH:=skip/' package/kernel/rtl8821cu/Makefile
+
+    # https://github.com/coolsnowwolf/packages/issues/466
+    cat ./feeds/luci/applications/luci-app-docker/root/etc/docker-init > ./feeds/luci/applications/luci-app-docker/root/etc/init.d/dockerd 
 fi
-sed -ri '\%/files/(daemon.json|dockerd.init|etc/config/dockerd)%d' feeds/packages/utils/dockerd/Makefile
-sed -ri '\%\$\(INSTALL_DIR\) \$\(1\)/etc/(docker|init\.d|config)%d' feeds/packages/utils/dockerd/Makefile
+
+# openwrt 的目录里没这目录
+# https://github.com/coolsnowwolf/lede/issues/3462
+[ ! -d tools/upx ] && svn export https://github.com/coolsnowwolf/lede/trunk/tools/upx   tools/upx
+[ ! -d tools/ucl ] && svn export https://github.com/coolsnowwolf/lede/trunk/tools/ucl   tools/ucl
+if ! grep -q upx tools/Makefile;then
+    SED_NUM=$(awk '$1=="tools-y"{a=NR}$1~/tools-\$/{print a;exit}' tools/Makefile)
+    sed -ri "${SED_NUM}a tools-y += ucl upx" tools/Makefile
+    sed -ri '/dependencies/a $(curdir)/upx/compile := $(curdir)/ucl/compile' tools/Makefile
+fi
+
+# if [ "$repo_name" = 'openwrt' ];then
+    # https://github.com/openwrt/routing/issues/882
+    # use lastet cjdns,  21.3编译失败，master也编译失败
+    # sed -i 's/PKG_SOURCE_VERSION:=.*/PKG_SOURCE_VERSION:=master/' feeds/routing/cjdns/Makefile
+    # sed -i 's/PKG_MIRROR_HASH:=.*/PKG_MIRROR_HASH:=skip/' feeds/routing/cjdns/Makefile
+    #rm -rf feeds/routing/cjdns /feeds/routing/luci-app-cjdns
+    find -type d -name "*cjdns*" | grep -E '(/|luci-app-)cjdns' | xargs -r rm -rf 
+# fi
+
 
 # https://github.com/vernesong/OpenClash/issues/1930
 # if [ -d feeds/others/luci-app-openclash ];then
@@ -36,17 +98,40 @@ sed -ri '\%\$\(INSTALL_DIR\) \$\(1\)/etc/(docker|init\.d|config)%d' feeds/packag
 # Modify default theme
 # https://github.com/jerrykuku/luci-theme-argon/tree/18.06
 # https://github.com/kenzok8/openwrt-packages
-sed -ri 's/luci-theme-\S+/luci-theme-argon/g' feeds/luci/collections/luci/Makefile  # feeds/luci/modules/luci-base/root/etc/config/luci
-rm -rf ./package/lean/luci-theme-argon
-mkdir -p package/community
-pushd package/community
-git clone --depth=1 -b 18.06 https://github.com/jerrykuku/luci-theme-argon
-git clone --depth=1 https://github.com/jerrykuku/luci-app-argon-config
-popd
+sed -ri 's/luci-theme-\S+/luci-theme-argonne/g' feeds/luci/collections/luci/Makefile  # feeds/luci/modules/luci-base/root/etc/config/luci
+
+
+# merge_package "-b 18.06 https://github.com/jerrykuku/luci-theme-argon"
+# merge_package "https://github.com/jerrykuku/luci-app-argon-config"
+
 #svn co https://github.com/immortalwrt/luci/trunk/themes/luci-theme-argon ./package/lean/luci-theme-argon
 
-# https://github.com/openwrt/luci/issues/5638
+# Add luci-app-oled (R2S Only)
+merge_package https://github.com/NateLol/luci-app-oled
+# enable r2s oled plugin by default
+sed -ri "s/enable\s+'0'/enable '1'/" package/custom/luci-app-oled/root/etc/config/oled
+
+
+# enable fan control
+# git apply 报错
+# wget https://github.com/friendlyarm/friendlywrt/commit/cebdc1f94dcd6363da3a5d7e1e69fd741b8b718e.patch
+# git apply cebdc1f94dcd6363da3a5d7e1e69fd741b8b718e.patch
+# rm cebdc1f94dcd6363da3a5d7e1e69fd741b8b718e.patch
+# sed -i 's/pwmchip1/pwmchip0/' target/linux/rockchip/armv8/base-files/usr/bin/fa-fancontrol.sh target/linux/rockchip/armv8/base-files/usr/bin/fa-fancontrol-direct.sh
+
+
+
+# https://github.com/NateLol/luci-app-oled/issues/21 解决中文问题
+[ -d package/custom/luci-app-oled/po/zh_Hans ] && mv package/custom/luci-app-oled/po/zh_Hans package/custom/luci-app-oled/po/zh-cn
+
+# https://github.com/coolsnowwolf/luci/issues/127
 [ -d package/lean/luci-app-filetransfer ] && sed -i '2a [ ! -f /etc/openwrt_release ] && exit 0' package/lean/luci-app-filetransfer/root/etc/uci-defaults/luci-filetransfer
+[ -f feeds/luci/applications/luci-app-unblockmusic/root/etc/init.d/unblockmusic ] && \
+    sed -i '1a [ ! -f /etc/openwrt_release ] && exit 0' feeds/luci/applications/luci-app-unblockmusic/root/etc/init.d/unblockmusic
+[ -f ./feeds/others/luci-app-argonne-config/root/etc/uci-defaults/luci-argonne-config ] && \
+    sed -i '1a [ ! -f /etc/openwrt_release ] && exit 0' ./feeds/others/luci-app-argonne-config/root/etc/uci-defaults/luci-argonne-config
+[ -f ./feeds/others/luci-theme-argonne/root/etc/uci-defaults/90_luci-theme-argonne ] && \
+    sed -i '1a [ ! -f /etc/openwrt_release ] && exit 0'  ./feeds/others/luci-theme-argonne/root/etc/uci-defaults/90_luci-theme-argonne
 
 #[ -f ./feeds/others/luci-theme-argonne/Makefile ] && sed -i '/LUCI_DEPENDS/s#=#&+libc#' ./feeds/others/luci-theme-argonne/Makefile
 if [ -f ./feeds/others/luci-theme-argonne/Makefile ];then
@@ -56,14 +141,6 @@ if [ -f ./feeds/others/luci-theme-argonne/Makefile ];then
     fi
 fi
 
-# luci-theme-atmaterial_new
-# https://github.com/kenzok8/openwrt-packages 已经添加了，所以这里备用拉取
-if [ ! -d feeds/others/luci-theme-atmaterial_new ];then
-    git clone -b main --depth 1 https://github.com/Chandler-Lu/openwrt-package /tmp/openwrt-package
-    if [ -d '/tmp/openwrt-package/luci-theme-atmaterial_new' ];then
-        mv /tmp/openwrt-package/luci-theme-atmaterial_new feeds/others/
-    fi
-fi
 
 # unblockneteasemusic 的 状态判断是 exec 调用 ps 命令，它没适配 proc-ng-ps 命令会影响 
 lua_file=`find -type f -name unblockneteasemusic.lua`
@@ -91,19 +168,21 @@ done
 
 
 chmod a+x ${GITHUB_WORKSPACE}/build/scripts/*.sh
+# 放入升级脚本
 \cp -a ${GITHUB_WORKSPACE}/build/scripts/update.sh files/
 
 # 修改banner
-echo -e " built on "$(TZ=Asia/Shanghai date '+%Y.%m.%d %H:%M') - ${GITHUB_RUN_NUMBER}"\n -----------------------------------------------------" >> package/base-files/files/etc/banner
+echo -e " zgz built on "$(TZ=Asia/Shanghai date '+%Y.%m.%d %H:%M') - ${GITHUB_RUN_NUMBER}"\n -----------------------------------------------------" >> package/base-files/files/etc/banner
 
-# /tmp/resolv.conf.d/resolv.conf.auto
-# mkdir -p files/tmp/resolv.conf.d/
-# echo nameserver 223.5.5.5 >> files/tmp/resolv.conf.d/resolv.conf.auto
+# mksquashfs 工具 segment fault
+# https://github.com/plougher/squashfs-tools/issues/190
+if [ -d feeds/packages/utils/squashfs-tools ];then
+    curl -sL https://raw.githubusercontent.com/coolsnowwolf/packages/caad6dedd4a029d10c6e75281e6e6e31d8d74eaf/utils/squashfs-tools/Makefile > feeds/packages/utils/squashfs-tools/Makefile
+fi
 
+# 修复 imageBuilder 打包 ntpdate 的 uci 错误
+if [ -f feeds/packages/net/ntpd/files/ntpdate.init ];then
+    sed -i '2a [ ! -f /etc/openwrt_release ] && exit 0' feeds/packages/net/ntpd/files/ntpdate.init
+fi
 
 # ---------- end -----------
-
-
-# https://github.com/coolsnowwolf/lede/issues/8423
-# https://github.com/coolsnowwolf/packages/pull/315 回退后删掉这三行
-sed -i 's/^\s*$[(]call\sEnsureVendoredVersion/#&/' feeds/packages/utils/dockerd/Makefile

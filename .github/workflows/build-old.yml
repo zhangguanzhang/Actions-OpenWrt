@@ -8,7 +8,7 @@
 # Description: Build OpenWrt using GitHub Actions
 #
 
-name: test
+name: Build OpenWrt-old
 
 on:
   repository_dispatch:
@@ -21,7 +21,7 @@ on:
       target:
         description: 'build/${target} to build'
         required: false
-        default: 'sft1200' #'x86_64'
+        default: 'r2s' #'x86_64'
       envOverride:
         description: 'key=value,key2=value2'
         required: false
@@ -133,12 +133,19 @@ jobs:
             find gh_* -type f -name gh -exec mv {} /usr/local/bin/ \;
             rm -rf gh_*linux*
             sudo chmod a+x /usr/local/bin/gh
-            gh auth login --with-token <<< ${{ secrets.gh_token }}
+            echo ${{ secrets.gh_token }} | gh auth login --with-token
           fi
           if command -v docker &>/dev/null && [ -n "${DOCKER_PASS}" ];then
             docker login -u ${{ github.repository_owner }} -p ${DOCKER_PASS}
           fi
         fi
+
+        git clone https://github.com/openwrt-dev/po2lmo.git
+        pushd po2lmo
+        make && sudo make install
+        popd
+        rm -rf po2lmo
+
         # 设置一些 condition 给后续步骤作为判断条件或者执行的值
         # 以及一些 shell
         bash env.sh
@@ -316,21 +323,18 @@ jobs:
       run: |
         cd openwrt
         echo -e "$(nproc) thread compile"
-        if [ "${AutoBuildTimeOut}" == true ] ;then
+        if [ -n "${{ secrets.gh_token }}" ] && [ "${AutoBuildTimeOut}" == true ] ;then
           createdAt=$(gh -R ${GITHUB_REPOSITORY}  run list --json databaseId,createdAt --jq ".[]|select(.databaseId==${{ github.run_id }})|.createdAt")
           usedSec=$(( `date +%s` - `date -d "$createdAt" +%s`  ))
           # 6小时超时，减去上传 cache 预留的 10 分钟后的时间作为 timeout 时间
           timeoutSec=$(( 6*60*60 - 10*60 - $usedSec  ))
           # 初次没缓存用 timeout 后防止超时 action ，后面会上传缓存目录
           echo timeout $timeoutSec make -j$(nproc) $MAKE_OPTS
-          if ! timeout $timeoutSec make -j$(nproc) $MAKE_OPTS;then
-            # timeout 超时是 124 返回码
-            makeExit=$?
-            echo "timeout make exitcode: $makeExit"
-            if [ $makeExit -ne 0 -a $makeExit -ne 124 ];then
-              echo 'failed: try to V=s'
-              make -j1 || make -j1 V=s
-            fi
+          timeout $timeoutSec make -j$(nproc) $MAKE_OPTS |& tee -a /tmp/build.log
+          # timeout 超时是 124 返回码，这里直接关键字匹配做详细信息的 make
+          if grep -qw 're-run make' /tmp/build.log;then
+            echo 'failed: try to V=s'
+            make -j1 || make -j1 V=s
           fi
         else
           make -j$(nproc) || make -j1 || make -j1 V=s
@@ -441,14 +445,19 @@ jobs:
       continue-on-error: true
       run: |
         sync
-        pushd $(dirname $(find openwrt/bin/targets/ -type f -name sha256sums ))
-        if ls *-imagebuilder-* &>/dev/null;then
-          # 清理下，防止此步上传超时
-          rm -rf openwrt-*
+        sha256_path=$(find openwrt/bin/targets/ -type f -name sha256sums )
+        if [ -n "$sha256_path" ];then
+          pushd $(dirname $sha256_path)
+          if ls *-imagebuilder-* &>/dev/null;then
+            # 清理下，防止此步上传超时
+            rm -rf openwrt-*
+          fi
+          popd
         fi
-        popd
+
         rm -rf openwrt/dl/ # 防止 action 里 inode 太多报错容量不够
 
+        nohup sh -c '
         echo "Listing 100 largest packages"
         dpkg-query -Wf '${Installed-Size}\t${Package}\n' | sort -n | tail -n 100
         df -h
@@ -462,6 +471,7 @@ jobs:
         sudo apt-get clean || true
         df -h
         df -i
+        ' &
     - name: Upload cache to release
       id: up_cache
       if: '!cancelled()'

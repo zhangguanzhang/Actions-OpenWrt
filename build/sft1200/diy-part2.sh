@@ -287,7 +287,7 @@ uci set dhcp.@dnsmasq[0].localservice='0'
 uci set dhcp.@dnsmasq[0].nonwildcard='0'
 # 不使用 dhcp 的 dns 
 uci set dhcp.@dnsmasq[0].resolvfile=''
-uci set dhcp.@dnsmasq[0].server='223.5.5.5'
+uci add_list dhcp.@dnsmasq[0].server='223.5.5.5#53'
 uci commit dhcp
 
 
@@ -310,7 +310,7 @@ EOF
 
 
 # 修改banner
-echo -e " built on "$(TZ=Asia/Shanghai date '+%Y.%m.%d %H:%M') - ${GITHUB_RUN_NUMBER}"\n -----------------------------------------------------" >> package/base-files/files/etc/banner
+echo -e " zgz built on "$(TZ=Asia/Shanghai date '+%Y.%m.%d %H:%M') - ${GITHUB_RUN_NUMBER}"\n -----------------------------------------------------" >> package/base-files/files/etc/banner
 
 # TODO: 下面是一些需要修复的东西
 

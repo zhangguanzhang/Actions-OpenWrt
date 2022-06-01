@@ -21,7 +21,7 @@ on:
       target:
         description: 'build/${target} to build'
         required: false
-        default: 'sft1200' #'x86_64'
+        default: 'r2s' #'x86_64'
       envOverride:
         description: 'key=value,key2=value2'
         required: false
@@ -34,14 +34,9 @@ on:
         description: 'os to use'
         required: false
         default: 'ubuntu-20.04'
-      # repo:
-      #   description: 'json raw string about repo to use'
-      #   required: false
-      #   default: '[{"name":"lede","url":"https://github.com/coolsnowwolf/lede"},{"name":"immortalwrt","url":"https://github.com/immortalwrt/immortalwrt"}]'
 
 env:
   FEEDS_CONF: feeds.conf.default
-  #CONFIG_FILE: .config
   DIY_P1_SH: diy-part1.sh
   DIY_P2_SH: diy-part2.sh
   DIY_AFTER: diy-after.sh
@@ -108,8 +103,16 @@ jobs:
         echo 'target: ${{ matrix.target }} ${{ toJSON(matrix.repo) }}'
         # 移动 $target ，后续步骤不记得不需要用 build/${{ github.event.inputs.target }}
         mv build/${{ github.event.inputs.target }}/* ${GITHUB_WORKSPACE}/
-        \cp ${GITHUB_WORKSPACE}/build/common.buildinfo ${GITHUB_WORKSPACE}/
+        \cp ${GITHUB_WORKSPACE}/build/*.buildinfo ${GITHUB_WORKSPACE}/
 
+        if [ ${GITHUB_REF##*/} = 'test' ] && [ "$(lscpu | awk '$1=="CPU"&&$2=="MHz:"{print int($3)}')" -le 2500 ];then
+          hour_num=$(TZ=Asia/Shanghai date '+%H')
+          # 白天频率太小不执行
+          if [ "${{ github.repository_owner }}" = zhangguanzhang ] && [ $hour_num -ge 9 ];then
+            echo "cpu 频率太小，不执行"
+            exit 233
+          fi
+        fi
     - name: Initialization environment
       env:
         DEBIAN_FRONTEND: noninteractive
@@ -125,7 +128,7 @@ jobs:
         else
           sudo rm -rf /etc/apt/sources.list.d/* /usr/share/dotnet /usr/local/lib/android /opt/ghc
           sudo -E apt-get -qq update
-          sudo -E apt-get -qq install python3-markdown $(curl -fsSL git.io/depends-ubuntu-2004) zstd upx jq
+          sudo -E apt-get -qq install python3-markdown $(curl -fsSL git.io/depends-ubuntu-2004) zstd upx jq pv ccache
           sudo -E apt-get -qq autoremove --purge
           sudo -E apt-get -qq clean
           sudo timedatectl set-timezone "$TZ"
@@ -133,17 +136,24 @@ jobs:
           # install github cli tool
           # gh 的 cli 用于构建缓存存储，这里加 env 判断防止 fork 的人不知道怎么设置而构建失败
           if [ -n "${{ secrets.gh_token }}" ];then
-            wget -q https://github.com/cli/cli/releases/download/v2.10.1/gh_2.10.1_linux_amd64.tar.gz
+            wget -q https://github.com/cli/cli/releases/download/v2.11.3/gh_2.11.3_linux_amd64.tar.gz
             tar zxf gh_*_linux_amd64.tar.gz
             find gh_* -type f -name gh -exec mv {} /usr/local/bin/ \;
             rm -rf gh_*linux*
             sudo chmod a+x /usr/local/bin/gh
-            gh auth login --with-token <<< ${{ secrets.gh_token }}
+            echo ${{ secrets.gh_token }} | gh auth login --with-token
           fi
           if command -v docker &>/dev/null && [ -n "${DOCKER_PASS}" ];then
             docker login -u ${{ github.repository_owner }} -p ${DOCKER_PASS}
           fi
         fi
+
+        git clone https://github.com/openwrt-dev/po2lmo.git
+        pushd po2lmo
+        make && sudo make install
+        popd
+        rm -rf po2lmo
+
         # 设置一些 condition 给后续步骤作为判断条件或者执行的值
         # 以及一些 shell
         bash env.sh
@@ -153,19 +163,51 @@ jobs:
     - name: Clone source code
       working-directory: /workdir
       run: |
+        set -x
         df -hT $PWD
-        # 有些 target clone 行为是自定义的，并不是克隆就完事了
+        if [ "$UseCache" = true -a -n "${{ secrets.gh_token }}" ];then
+            gh release -R ${GITHUB_REPOSITORY} list | grep -Ew cache || gh release -R ${GITHUB_REPOSITORY} create cache -t '' -n ''
+            gh release -R ${GITHUB_REPOSITORY} view cache 2>/dev/null | grep -Po 'asset:\s+\K\S+' > /tmp/log || true
+            if grep -E "${cache_name}.img.zst" /tmp/log;then
+              echo 'start download cache:' `grep -E "${cache_name}.img.zst" /tmp/log`
+              gh release -R ${GITHUB_REPOSITORY} download cache -p "${cache_name}.img.zst.*"
+              cat ${cache_name}.img.zst.* | zstdmt -d -o ${GITHUB_WORKSPACE}/${cache_name}.img
+              rm -f ${cache_name}.img.zst.*
+            fi
+        fi
+        if [ ! -f "${GITHUB_WORKSPACE}/${cache_name}.img" ];then
+          truncate -s 33g ${GITHUB_WORKSPACE}/${cache_name}.img && mkfs.btrfs -M ${GITHUB_WORKSPACE}/${cache_name}.img
+          echo "CACHE=false" >> $GITHUB_ENV
+        else
+          echo "CACHE=true" >> $GITHUB_ENV
+        fi
+        LOOP_DEVICE=$(losetup -f) && echo "LOOP_DEVICE=$LOOP_DEVICE" >> $GITHUB_ENV
+        sudo losetup -P --direct-io $LOOP_DEVICE ${GITHUB_WORKSPACE}/${cache_name}.img
+
+        # https://forum.openwrt.org/t/using-precompiled-toolchain/87446/6
+        # 直接缓存所有目录得了
+        #mkdir -p cache/{build_dir,staging_dir,tmp} openwrt/{build_dir,staging_dir,tmp}
+
+        mkdir openwrt && sudo mount -o nossd,compress=zstd $LOOP_DEVICE openwrt
+        # 有些特殊设备单独自己维护缓存和没缓存的目录准备工作
         if [ -f "${GITHUB_WORKSPACE}/clone.sh" ];then
             bash ${GITHUB_WORKSPACE}/clone.sh
         else
-          #git clone $REPO_URL -b $REPO_BRANCH openwrt
-            git clone ${{ matrix.repo.addr }} -b ${{ matrix.repo.branch }} openwrt
+            if [ -d 'openwrt/.git' ]; then
+              cd openwrt && rm -f zerospace && git config --local user.email "action@github.com" && git config --local user.name "GitHub Action"
+              git fetch && git reset --hard origin/${{ matrix.repo.branch }} && git clean -df
+            else
+              sudo chown $USER:$(id -gn) openwrt && git clone -b ${{ matrix.repo.branch }} --single-branch ${{ matrix.repo.addr }} openwrt
+            fi
             ln -sf /workdir/openwrt $GITHUB_WORKSPACE/openwrt
             echo "BaseDir=/workdir/openwrt" >> $GITHUB_ENV
         fi
+
         cd ${BaseDir}
         readlink -f $GITHUB_WORKSPACE/openwrt
-        ls -l . $GITHUB_WORKSPACE/openwrt/
+        ls -l . $GITHUB_WORKSPACE/ $GITHUB_WORKSPACE/openwrt/
+
+        echo "repo_name=${{ matrix.repo.name }}" >> $GITHUB_ENV
 
     - name: Load custom feeds
       run: |
@@ -173,12 +215,23 @@ jobs:
         if [ -f "$DIY_P1_SH" ];then
           chmod +x $DIY_P1_SH
           cd openwrt
+          echo "Start Running: $DIY_P1_SH"
           $GITHUB_WORKSPACE/$DIY_P1_SH
         fi
 
     - name: Update feeds
       if: env.UdateFeeds == 'true'
-      run: cd openwrt && ./scripts/feeds update -a
+      run: |
+        cd openwrt
+        awk '$1!~"#"{print $2}' feeds.conf.default | while read dir;do
+            if [ -d feeds/${dir}/.git ];then
+                pushd feeds/${dir}
+                #[ -n "$(git diff --name-only)" ] && git reset --hard HEAD
+                git restore .
+                popd
+            fi
+        done
+        ./scripts/feeds update -a
 
     - name: Install feeds
       if: env.InstallFeeds == 'true'
@@ -186,12 +239,31 @@ jobs:
 
     - name: Load custom configuration
       run: |
-        # set -x
+        
         [ -e files ] && mv files openwrt/files
         export CONFIG=${{ github.event.inputs.config }}
         echo "use the .config file:" "${CONFIG}"
-        cp config/${CONFIG} openwrt/.config
-        cp common.buildinfo openwrt/
+        \cp config/${CONFIG} openwrt/.config
+
+        cd openwrt
+          if [ "$UdateFeeds" = true ];then
+              # 添加的 feeds 应用包优先于自带的 feed 里的 app
+              echo "重复的包检测：👇"
+              ./scripts/feeds list  | awk '{if(a[$1]){print $1}else{a[$1]++}}'
+              echo "重复的包检测：👆"
+              ./scripts/feeds list  | awk '{if(a[$1]){print $1}else{a[$1]++}}' | while read pkg_name;do
+                  # 目录是 / 分隔，feeds/xxx/ 一样就不打印
+                  find feeds/ -maxdepth 4 -type d -name $pkg_name | \
+                    awk -F/ 'NR==1{a[$2]=$0};NR==2{if(!a[$2]){for(i in a){if(a[i]){printf "%s/ %s\n",$0,a[i]}}}}' | \
+                    xargs -r -n2 echo  👉 rsync -av --delete
+                  find feeds/ -maxdepth 4 -type d -name $pkg_name | \
+                    awk -F/ 'NR==1{a[$2]=$0};NR==2{if(!a[$2]){for(i in a){if(a[i]){printf "%s/ %s\n",$0,a[i]}}}}' | \
+                    xargs -r -n2 rsync -av --delete
+          done
+        fi
+        cd -
+
+        set -x
 
         # feeds 后做些修改
         chmod +x $DIY_P2_SH
@@ -199,61 +271,65 @@ jobs:
         $GITHUB_WORKSPACE/$DIY_P2_SH
         popd
 
-        if [ "$UseCache" = true -a -n "${{ secrets.gh_token }}" ];then
-            gh release -R ${GITHUB_REPOSITORY} list | grep -Ew cache || gh release -R ${GITHUB_REPOSITORY} create cache -t '' -n ''
-            gh release -R ${GITHUB_REPOSITORY} view cache 2>/dev/null | grep -Po 'asset:\s+\K\S+' > /tmp/log || true
-            if grep -E "${cache_name}.img.zst" /tmp/log;then
-              gh release -R ${GITHUB_REPOSITORY} download cache -p "${cache_name}.img.zst.*"
-              cat ${cache_name}.img.zst.* | zstdmt -d -o ${cache_name}.img
-              rm -f ${cache_name}.img.zst.*
-            else
-              truncate -s 30g ${cache_name}.img && mkfs.btrfs -M ${cache_name}.img
-              NO_CACHE=1
-              echo "NO_CACHE=1" >> $GITHUB_ENV
-            fi
-            LOOP_DEVICE=$(losetup -f) && echo "LOOP_DEVICE=$LOOP_DEVICE" >> $GITHUB_ENV
-            sudo losetup -P --direct-io $LOOP_DEVICE ${cache_name}.img
-            mkdir cache && sudo mount -o nossd,compress=zstd $LOOP_DEVICE cache
-            sudo chown -R $USER:$GROUPS cache
-            # https://forum.openwrt.org/t/using-precompiled-toolchain/87446/6
-            #mkdir -p cache/{build_dir,staging_dir,tmp} openwrt/{build_dir,staging_dir,tmp}
-            mkdir -p cache/{build_dir,staging_dir} openwrt/{build_dir,staging_dir}
-            (
-              if [ "$NO_CACHE" != 1 ];then
-                cd cache
-                find build_dir/{host*,toolchain-*} -name .built\* -exec touch {} \;
-                touch staging_dir/{host*,toolchain-*}/stamp/.*
-                ls -l {staging_dir,build_dir}/{host,hostpkg}
-              fi
-            )
-            sudo mount --bind cache/build_dir    openwrt/build_dir
-            sudo mount --bind cache/staging_dir  openwrt/staging_dir
-            # sudo mount --bind cache/tmp          openwrt/tmp
-            
-        fi
         # 有缓存存在才构建 imageBuilder，否则第一次生成缓存可能会很久甚至失败，此刻构建 imageBuilder 没有意义
-        if grep -Eq '^CONFIG_IB=y'  openwrt/.config && [ "$NO_CACHE" != 1 ];then
-            pushd openwrt
-            cp .config config.buildinfo
-            sed_num=$( grep -n '$(TOPDIR)/.config' target/imagebuilder/Makefile | cut -d: -f1 )
-            sed -ri ${sed_num}'{s#cp#& -a $(TOPDIR)/files $(TOPDIR)/*.buildinfo#;s#.config$##;}' target/imagebuilder/Makefile
-            if [ "${{ matrix.repo.name }}" == lede ];then
-              find package/ -type d -name luci-app-* | awk -F/ '{printf "CONFIG_PACKAGE_%s=m\n",$NF}' >> .config
+        if grep -Eq '^CONFIG_IB=y'  openwrt/.config;then
+            echo 'MAKE_OPTS=IGNORE_ERRORS=1' >> $GITHUB_ENV
+            if [ "$CACHE" == true ];then
+            # 缓存存在下，slim 和 full 版本的准备行为
+                pushd openwrt
+                sed_num=$( grep -n '$(TOPDIR)/.config' target/imagebuilder/Makefile | cut -d: -f1 )
+                # hack imageBuilder 构建出来带 *.buildinfo 和 files/
+                sed -ri ${sed_num}'{s#cp#& -a $(TOPDIR)/files $(TOPDIR)/*.buildinfo#;s#.config$##;}' target/imagebuilder/Makefile
+
+                if [ "${{ matrix.repo.name }}" == lede ] || [ "${{ matrix.repo.name }}" == immortalwrt ];then
+                  find package/ -type d -name luci-app-* | awk -F/ '{printf "CONFIG_PACKAGE_%s=m\n",$NF}' | sort >> .config
+                  # TODO 查找更多的 app 包，但是不知道容量能撑住不 find  -type d -name luci-app-* | awk -F/ '!a[$NF]++{print $NF}'
+                  # find -type d -name luci-app-* | awk -F/ '!a[$NF]++{printf "CONFIG_PACKAGE_%s=m\n",$NF}'| sort >> .config
+                  # 主题不在 package 里，
+                  find feeds/ -type d -name luci-theme-* | awk -F/ '!a[$NF]++{printf "CONFIG_PACKAGE_%s=m\n",$NF}' | sort >> .config
+                fi
+
+                # 去重，如果 make defconfig 时候.config 里不是后面值覆盖前面的值，那就需要提前删掉 .config 里的 luci-app* 
+                find feeds -type d -name 'luci-app-*' | awk -F'/' '!a[$NF]++{print $NF}'  | \
+                  sort | xargs -n1 -i echo CONFIG_PACKAGE_{}=m >> .config
+                
+                sed -ri 's#(^CONFIG_PACKAGE_luci-app-[^A-Z]*=)y#\1m#' .config
+                # 下面这样太多包参与编译了，action 会超时，只像上面开启 luci-app-*
+                #sed -ri '/CONFIG_PACKAGE_[0-9a-z-]+(=| )/{s@^#\s+@@;s@(=y|\s+is not set)@=m@}' .config
+                popd
+            else # 
+                true
             fi
-            #sed -ri 's#(^CONFIG_PACKAGE_luci-app-[^A-Z]*=)y#\1m#' .config
-            sed -ri '/CONFIG_PACKAGE_[0-9a-z-]+(=| )/{s@^#\s+@@;s@(=y|\s+is not set)@=m@}' .config
-            popd
+        else # 没开 imageBuilder 
+            echo 'MAKE_OPTS=' >> $GITHUB_ENV
         fi
-        if [ ! -f 'openwrt/config.buildinfo' ];then
-          cp openwrt/.config openwrt/config.buildinfo
+
+        # 根目录的 common docker disable
+        cp *.buildinfo openwrt/
+        rm -f openwrt/disable.buildinfo
+
+        [ -f config/disable.buildinfo ] && cat config/disable.buildinfo >> disable.buildinfo
+
+        [ "$EnableDocker" != 'true' ] && rm -f openwrt/docker.buildinfo
+        cat openwrt/*.buildinfo >> openwrt/.config
+        # 最后写入 disable，理论上能覆盖掉前面的一些开启
+        cat disable.buildinfo >> openwrt/.config
+        cp disable.buildinfo  openwrt/
+
+        # 保留一个原来副本，后续 full 使用
+        \cp config/${CONFIG} openwrt/config.buildinfo
+
+        if grep -Eq '^CONFIG_IB=y' openwrt/.config && [ "$CACHE" == true ];then
+          \cp openwrt/.config openwrt/full.buildinfo
         fi
-        # TODO:
-        # 根目录的 common.buildinfo 暂时包含了 docker，后续应该最小化到运维工具
-        # 目前 sft1200 会提前清空该文件不走下面逻辑
-        if [ -s 'openwrt/common.buildinfo' ];then
-          sed -n '/---/,$p' openwrt/common.buildinfo >> openwrt/.config
-          sed -n '/---/,$p' openwrt/common.buildinfo >> openwrt/config.buildinfo
-        fi
+        pushd openwrt
+        sed -ri '/luci-app-.+?_dynamic=m/s#=m#=y#' .config
+        make defconfig && sed -i -E 's/# (CONFIG_.*_COMPRESS_UPX) is not set/\1=y/' .config && make defconfig
+
+    - name: cat .config
+      run: |
+        cd openwrt
+        cat .config
 
     - name: SSH connection to Actions
       uses: P3TERX/ssh2actions@v1.0.0
@@ -266,51 +342,20 @@ jobs:
       id: package
       run: |
         cd openwrt
-        make defconfig
-        # 压缩所有
-        sed -ri 's@^#\s(CONFIG_.+?_UPX) is not set@\1=y@' .config
-        make defconfig
-        
-        # 开启 imagebuilder 的话 保留一个.config.bak 给非 slim 使用
-        if grep -Eq '^CONFIG_IB=y' .config;then
-          echo 'MAKE_OPTS=IGNORE_ERRORS=1' >> $GITHUB_ENV
-          if [ "$NO_CACHE" != 1 ];then
-            mv .config config.slim
-            cat config.buildinfo > .config
-            make defconfig
-            cp .config full.buildinfo # 非slim的文件
-            cat config.slim > .config
-            # sed -ri '/option check_signature/s@option@#&@' ./package/system/opkg/Makefile
-          else
-            # 如果初次没缓存，只编译基础的
-            cat common.buildinfo > .config
-            make defconfig
-            sed -ri '/^CONFIG_PACKAGE_luci-app-[0-9a-z-]+=y/{s@^@# @;s@=y@ is not set@}' .config
-            make defconfig
-          fi
-        else
-          echo 'MAKE_OPTS=' >> $GITHUB_ENV
-        fi
-
         if [ "$MakeDownload" == true ];then
+          # 防止缓存了老版本的包
+          rm -rf dl/go-mod-cache
           make download -j8
           find dl -size -1024c -exec ls -l {} \;
           find dl -size -1024c -exec rm -f {} \;
         fi
-        cat .config
-        if grep -q '^CONFIG_TARGET.*DEVICE.*=y' .config;then
-          grep '^CONFIG_TARGET.*DEVICE.*=y' .config | sed -r 's/.*DEVICE_(.*)=y/\1/' > DEVICE_NAME
-        else
-          echo "${{ matrix.target }}" > DEVICE_NAME
-        fi
-        [ -s DEVICE_NAME ] && echo "DEVICE_NAME=_$(cat DEVICE_NAME)" >> $GITHUB_ENV
         ls -al ${BaseDir}
 
     - name: Upload buildInfo
       uses: actions/upload-artifact@main
       if: '!cancelled()'
       with:
-        name: openwrt-buildInfo-${{ env.DEVICE_NAME }}-${{ env.cache_name }}
+        name: openwrt-buildInfo${{ env.DEVICE_NAME }}-${{ env.cache_name }}
         # https://github.com/actions/upload-artifact/issues/92
         path: |
           ${{ env.BaseDir }}/.config
@@ -321,26 +366,57 @@ jobs:
       run: |
         cd openwrt
         echo -e "$(nproc) thread compile"
-        if [ "${AutoBuildTimeOut}" == true ] ;then
+        if [ -n "${{ secrets.gh_token }}" -a "${AutoBuildTimeOut}" == true ] ;then
           createdAt=$(gh -R ${GITHUB_REPOSITORY}  run list --json databaseId,createdAt --jq ".[]|select(.databaseId==${{ github.run_id }})|.createdAt")
+          echo "createdAt=$createdAt" >> $GITHUB_ENV
           usedSec=$(( `date +%s` - `date -d "$createdAt" +%s`  ))
-          # 6小时超时，减去上传 cache 预留的 10 分钟后的时间作为 timeout 时间
-          timeoutSec=$(( 6*60*60 - 10*60 - $usedSec  ))
+          # 6小时超时，减去上传 cache 预留的 15 分钟后的时间作为 timeout 时间
+          timeoutSec=$(( 6*60*60 - 17*60 - $usedSec  ))
           # 初次没缓存用 timeout 后防止超时 action ，后面会上传缓存目录
           echo timeout $timeoutSec make -j$(nproc) $MAKE_OPTS
-          if ! timeout $timeoutSec make -j$(nproc) $MAKE_OPTS;then
-            # timeout 超时是 124 返回码
-            makeExit=$?
-            echo "timeout make exitcode: $makeExit"
-            if [ $makeExit -ne 0 -a $makeExit -ne 124 ];then
-              echo 'failed: try to V=s'
-              make -j1 || make -j1 V=s
-            fi
+          timeout $timeoutSec make -j$(nproc) $MAKE_OPTS |& tee -a /tmp/build.log
+          # timeout 超时是 124 返回码，这里直接关键字匹配做详细信息的 make
+          if grep -qw 're-run make' /tmp/build.log;then
+            echo 'failed: try to V=s'
+            make -j1 || make -j1 V=s
           fi
         else
           make -j$(nproc) || make -j1 || make -j1 V=s
         fi
         echo "FILE_DATE=_$(date +"%Y%m%d%H%M")" >> $GITHUB_ENV
+        echo "======================="
+        echo "Space usage:"
+        echo "======================="
+        df -h
+        echo "======================="
+        du -h --max-depth=1 ./ --exclude=build_dir --exclude=bin
+        du -h --max-depth=1 ./build_dir
+        du -h --max-depth=1 ./bin
+
+        if grep -q '^CONFIG_TARGET.*DEVICE.*=y' .config;then
+          grep '^CONFIG_TARGET.*DEVICE.*=y' .config | sed -r 's/.*DEVICE_(.*)=y/\1/' > DEVICE_NAME
+        else
+          echo "${{ matrix.target }}" > DEVICE_NAME
+        fi
+        [ -s DEVICE_NAME ] && echo "DEVICE_NAME=_$(cat DEVICE_NAME)" >> $GITHUB_ENV
+        rm -f DEVICE_NAME
+
+    - name: retry with V=s in failed packages
+      if: (!cancelled())
+      run: |
+        cd openwrt
+        set -x
+        # 编译时间很早完成的话，make -v 看下 ERROR: package/feeds/routing/cjdns failed to build. 的编译错误信息
+        if [ -n "${{ secrets.gh_token }}" ];then
+          usedSec=$(( `date +%s` - `date -d "$createdAt" +%s`  ))
+          # 小于 5 小时构建完，此刻单独构建失败的
+          if [ $usedSec -lt $((4*60*60)) ];then
+            for pkg in `grep -Po 'ERROR:\s+\K\S+' /tmp/build.log`;do
+                echo "开始单独尝试 make $pkg/compile V=s 编译查看详细信息"
+                make $pkg/compile V=s || true
+            done
+          fi
+        fi
 
     - name: Check space usage
       if: (!cancelled())
@@ -370,21 +446,26 @@ jobs:
         pwd
         rm -rf packages
         echo "FIRMWARE=$PWD" >> $GITHUB_ENV
-        echo "::set-output name=status::success"
+        # 没缓存，并且有固件生成，则上传
+        if [ `find -type f -size +5M | grep -Ev 'openwrt-imagebuilder' |wc -l` -ne 0 ] && [ "$CACHE" == false ] ;then
+          echo "::set-output name=status::success"
+        fi
 
         # 下面 outputs 是后面上传 imageBuidler 的判断条件和名字
         if ls *-imagebuilder-* &>/dev/null;then
           echo "::set-output name=imageBuilder::openwrt-imagebuilder-${{ env.DEVICE_NAME }}-${{ matrix.repo.name }}-${{ matrix.repo.branch }}"
+        else
+          echo "no_imageBuilder=true" >> $GITHUB_ENV
         fi
         echo "::set-output name=build_target::${{ matrix.target }}"
 
-    # - name: Do something after Compile
-    #   if: steps.organize.outputs.status == 'success' && !cancelled()
-    #   run: |
-    #     cd openwrt
-    #     if [ -f "$GITHUB_WORKSPACE/$DIY_AFTER" ];then
-    #       bash $GITHUB_WORKSPACE/$DIY_AFTER
-    #     fi
+    - name: Do something after Compile
+      if: steps.organize.outputs.status == 'success' && !cancelled()
+      run: |
+        cd openwrt
+        if [ -f "$GITHUB_WORKSPACE/$DIY_AFTER" ] && [ "$no_imageBuilder" = true ] ;then
+          bash $GITHUB_WORKSPACE/$DIY_AFTER
+        fi
 
     - name: Upload firmware directory
       uses: actions/upload-artifact@main
@@ -446,14 +527,17 @@ jobs:
       continue-on-error: true
       run: |
         sync
-        pushd $(dirname $(find openwrt/bin/targets/ -type f -name sha256sums ))
-        if ls *-imagebuilder-* &>/dev/null;then
-          # 清理下，防止此步上传超时
-          rm -rf openwrt-*
+        sha256_path=$(find openwrt/bin/targets/ -type f -name sha256sums )
+        if [ -n "$sha256_path" ];then
+          pushd $(dirname $sha256_path)
+          if ls *-imagebuilder-* &>/dev/null;then
+            # 有 imagebuilder下，清理下，防止此步上传超时
+            rm -rf openwrt-*
+          fi
+          popd
         fi
-        popd
-        rm -rf openwrt/dl/ # 防止 action 里 inode 太多报错容量不够
 
+        nohup sh -c '
         echo "Listing 100 largest packages"
         dpkg-query -Wf '${Installed-Size}\t${Package}\n' | sort -n | tail -n 100
         df -h
@@ -467,26 +551,42 @@ jobs:
         sudo apt-get clean || true
         df -h
         df -i
+        ' &
     - name: Upload cache to release
       id: up_cache
       if: '!cancelled()'
       continue-on-error: true
       run: |
+
         if [ "${UseCache}" == true -a -n "${{ secrets.gh_token }}" ];then
+          set -x
+          # TODO
+          # 可以在目录里在文件 env 里写入时间，然后在 compile 之前，如果文件时间比当前时间差距大于2天，则删除 dl/go-mod-cache
+          rm -rf openwrt/{bin,tmp,files}
           #sudo umount openwrt/{build_dir,staging_dir,tmp} cache
           # https://unix.stackexchange.com/questions/18048/list-only-bind-mounts
-          for path in `sudo findmnt --kernel -n --list | grep '\[' | awk -vWorkDir="$GITHUB_WORKSPACE"  '($2 ~ WorkDir"/cache/" && $1 ~ WorkDir"/openwrt/"){print $1}'`;do
-            sudo umount $path
-          done
-          sudo umount cache
-
-          #sudo losetup -l -O NAME -n | awk '$0~"/${cache_name}.img"{print $1}' | xargs -r sudo losetup -d
-          sudo losetup -l -O NAME -n | awk '$0~"/'${cache_name}'.img"{print $1}' | xargs -r sudo losetup -d
+          # for path in `sudo findmnt --kernel -n --list | grep '\[' | awk -vWorkDir="$GITHUB_WORKSPACE"  '($2 ~ WorkDir"/cache/" && $1 ~ WorkDir"/openwrt/"){print $1}'`;do
+          #   sudo umount $path
+          # done
+          # sudo umount cache
+          sleep 1
+          sudo mount -o remount,compress=no,nodatacow,nodatasum openwrt
+          # https://github.com/klever1988/nanopi-openwrt/issues/1158
+          pv /dev/zero > openwrt/zerospace || true
+          sync
+          rm -f openwrt/zerospace || true
+          sleep 5
+          sudo umount -f openwrt
           sleep 2
+          # sudo losetup -l -O NAME -n | awk '$0~"/'${cache_name}'.img"{print $1}' | xargs -r sudo losetup -d
+          sudo losetup -d $LOOP_DEVICE
           sync
           zstdmt -c --long ${cache_name}.img | split --numeric=1 -b 2000m - ${cache_name}.img.zst.
           ls -l
           rm -f ${cache_name}.img # 减少容量
+          # 可能存在当前上传的切割文件数量少于 cache release 上的，需要提前删除
+          gh release -R ${GITHUB_REPOSITORY} view cache  2>/dev/null | grep -Po "asset:\s+\K${cache_name}.img.zst.\d+" | \
+              xargs -r -n1 gh release -R ${GITHUB_REPOSITORY} delete-asset cache  -y
           gh release -R ${GITHUB_REPOSITORY} upload cache ${cache_name}.img.zst.* --clobber
         fi
 
@@ -509,7 +609,7 @@ jobs:
     needs: [set_matrix, build]
     if: needs.build.outputs.imageBuilder
     runs-on: ${{ github.event.inputs.os }}
-    name: "编译 repo: ${{matrix.repo.name}} - ${{matrix.target}}"
+    name: "编译 ${{matrix.repo.name}}-${{matrix.repo.branch}}: ${{matrix.target}}"
     strategy:
       fail-fast: false
       matrix:
@@ -529,15 +629,17 @@ jobs:
         df -h
         lscpu
         free -h
-        echo 'target: ${{matrix.target}}'
+        #                   slim/full
+        echo 'target: ${{matrix.target}}' 'repo: ${{ toJSON(matrix.repo) }}'
 
     - name: Initialization environment
+      id: init
       env:
         DEBIAN_FRONTEND: noninteractive
       run: |
         sudo rm -rf /etc/apt/sources.list.d/* /usr/share/dotnet /usr/local/lib/android /opt/ghc
         sudo -E apt-get -qq update
-        sudo -E apt-get -qq install python3-markdown $(curl -fsSL git.io/depends-ubuntu-2004)
+        sudo -E apt-get -qq install python3-markdown $(curl -fsSL git.io/depends-ubuntu-2004) jq rename
         sudo -E apt-get -qq autoremove --purge
         sudo -E apt-get -qq clean
         sudo timedatectl set-timezone "$TZ"
@@ -546,12 +648,24 @@ jobs:
         i=0
         while [ "$i" -le 100 ];do
           if command -v docker &>/dev/null && [ -n "${DOCKER_PASS}" ];then
-            docker info | grep -wq 'zhangguanzhang'  || docker login -u zhangguanzhang -p ${DOCKER_PASS}
-            docker login -u zhangguanzhang@qq.com -p ${DOCKER_PASS} registry.aliyuncs.com
+            docker info | grep -wq '${{ github.repository_owner }}'  || docker login -u ${{ github.repository_owner }} -p ${DOCKER_PASS}
+            docker login -u ${{ github.repository_owner }}@qq.com -p ${DOCKER_PASS} registry.aliyuncs.com
             [ "$?" -eq 0 ] && break || lei i++
           fi
         done
         docker info
+
+        # install github cli tool
+        # 上传到latest分支
+        if [ -n "${{ secrets.gh_token }}" ];then
+          wget -q https://github.com/cli/cli/releases/download/v2.11.3/gh_2.11.3_linux_amd64.tar.gz
+          tar zxf gh_*_linux_amd64.tar.gz
+          find gh_* -type f -name gh -exec mv {} /usr/local/bin/ \;
+          rm -rf gh_*linux*
+          sudo chmod a+x /usr/local/bin/gh
+          echo ${{ secrets.gh_token }} | gh auth login --with-token
+          echo "::set-output name=gh::success"
+        fi
 
     - name: Download imagebuilder (Artifact)
       uses: actions/download-artifact@v2
@@ -589,14 +703,17 @@ jobs:
 
         extra_pkgs=" -luci-app-ssr-plus -luci-app-samba"
         if [ "${{matrix.target}}" == 'slim' ];then
+          extra_pkgs+=' -luci-app-docker'
           PACKAGES=$( grep -Po '^CONFIG_PACKAGE_\K[^A-Z=]+' common.buildinfo | tr '\n' ' ' )
         else
           PACKAGES=$( grep -Po '^CONFIG_PACKAGE_\K[^A-Z=]+(?==y)' full.buildinfo | xargs -n1 -i grep -o {} package.list | awk '!a[$0]++' | xargs echo )
+          # 存在 docker.buildinfo 就安装docker
+          [ -f docker.buildinfo ] && extra_pkgs+=' luci-app-dockerman'
         fi
-        make image PACKAGES="$PACKAGES ${extra_pkgs}" FILES="files" |& tee -a /tmp/log
+        make image PACKAGES="$PACKAGES ${extra_pkgs} " FILES="files" |& tee -a /tmp/log
         REMOVE_PKGS=$( grep -Po 'Cannot install package \K[^.]+' /tmp/log | awk '{printf "-%s ",$0}' )
         if [ -n "$REMOVE_PKGS" ];then
-          echo "打包报错，已下包存在依赖问题: ${REMOVE_PKGS}"
+          echo "打包报错，以下包存在依赖问题: ${REMOVE_PKGS}"
           echo "尝试移除上面的包打包"
           # 不删除则会文件已存在而不更新签名，貌似这样也解决不了。。,后面改 sed -ri '/check_signature/s@^[^#]@#&@' /etc/opkg.conf 暂时屏蔽前面错误
           rm -f files/local_feed/Packages*
@@ -607,8 +724,8 @@ jobs:
 
         echo "::set-output name=status::success"
         grep '^CONFIG_TARGET.*DEVICE.*=y' .config | sed -r 's/.*DEVICE_(.*)=y/\1/' > DEVICE_NAME
-        [ -s DEVICE_NAME ] && echo "DEVICE_NAME=_$(cat DEVICE_NAME)" >> $GITHUB_ENV
-        echo "FILE_DATE=_$(date +"%Y%m%d%H%M")" >> $GITHUB_ENV
+        [ -s DEVICE_NAME ] && echo "DEVICE_NAME=$(cat DEVICE_NAME)" >> $GITHUB_ENV
+        echo "FILE_DATE=$(date +"%Y%m%d%H%M")" >> $GITHUB_ENV
 
     - name: Organize files
       id: organize
@@ -625,6 +742,7 @@ jobs:
       run: |
         cd openwrt-imagebuilder-*/
         if [ -f "$GITHUB_WORKSPACE/$DIY_AFTER" ];then
+          export device_name=${{ needs.build.outputs.build_target }}
           bash $GITHUB_WORKSPACE/$DIY_AFTER ${{ matrix.repo.name }}-${{ matrix.repo.branch }} ${{ env.suffix }} 
         fi
 
@@ -632,6 +750,21 @@ jobs:
       uses: actions/upload-artifact@main
       if: steps.organize.outputs.status == 'success' && !cancelled()
       with:
-        name: OpenWrt_firmware${{ env.DEVICE_NAME }}${{ env.FILE_DATE }}${{ env.suffix }}-${{ matrix.repo.name }}-${{ matrix.repo.branch }}
+        name: OpenWrt_firmware-${{ env.DEVICE_NAME }}_${{ env.FILE_DATE }}${{ env.suffix }}-${{ matrix.repo.name }}-${{ matrix.repo.branch }}
         path: |
           ${{ env.FIRMWARE }}
+
+    - name: Upload firmware to release
+      if: steps.init.outputs.gh == 'success' && !cancelled()
+      run: |
+        set -x
+        cd openwrt-imagebuilder-*/bin/targets/*/*
+        name_str_target=${{ needs.build.outputs.build_target }}
+        [ "$name_str_target" = 'x86_64' ] && name_str_target=x86-64
+
+        prename -v "s#^.+${name_str_target}#${{ matrix.repo.name }}-${{ matrix.repo.branch }}-${{ needs.build.outputs.build_target }}${suffix}#" *${name_str_target}*
+        mv sha256sums ${{ matrix.repo.name }}-${{ matrix.repo.branch }}-${{ needs.build.outputs.build_target }}${suffix}-sha256sums
+        ls -l
+        [ ${GITHUB_REF##*/} = 'main' ] && tag=latest || tag=test
+        gh release -R ${GITHUB_REPOSITORY} list | grep -Ew ${tag} || gh release -R ${GITHUB_REPOSITORY} create ${tag} -t '' -n ''
+        gh release -R ${GITHUB_REPOSITORY} upload ${tag} * --clobber

@@ -1,4 +1,6 @@
 CONFIG_HAS_FPU=y
+
+
 CONFIG_PACKAGE_luci-i18n-base-zh-cn=y
 CONFIG_PACKAGE_luci-i18n-firewall-zh-cn=y
 CONFIG_PACKAGE_luci-app-ttyd=y
@@ -10,12 +12,9 @@ CONFIG_PACKAGE_luci-proto-wireguard=y
 CONFIG_PACKAGE_wireguard-tools=y
 
 CONFIG_PACKAGE_luci-app-turboacc=y
+CONFIG_PACKAGE_luci-i18n-turboacc-zh-cn=y
 
 CONFIG_PACKAGE_default-settings=y
-
-CONFIG_PACKAGE_libc=y
-CONFIG_PACKAGE_librt=y
-CONFIG_PACKAGE_libpthread=y
 
 CONFIG_PACKAGE_bind-dig=y
 CONFIG_PACKAGE_curl=y
@@ -73,27 +72,6 @@ CONFIG_PACKAGE_TAR_BZIP2=y
 CONFIG_PACKAGE_TAR_GZIP=y
 CONFIG_PACKAGE_TAR_XZ=y
 CONFIG_PACKAGE_TAR_ZSTD=y
-
-# docker
-CONFIG_PACKAGE_runc=y
-CONFIG_PACKAGE_luci-app-docker=y
-CONFIG_PACKAGE_docker-compose=y
-CONFIG_DOCKER_KERNEL_OPTIONS=y
-CONFIG_DOCKER_NET_ENCRYPT=y
-CONFIG_DOCKER_NET_MACVLAN=y
-CONFIG_DOCKER_NET_OVERLAY=y
-CONFIG_DOCKER_NET_TFTP=y
-CONFIG_DOCKER_RES_SHAPE=y
-CONFIG_DOCKER_SECCOMP=y
-CONFIG_DOCKER_STO_BTRFS=y
-CONFIG_DOCKER_STO_EXT4=y
-
-# ---- 不变的关闭和开启选项，写在最后面
-# 编译报错,也 https://github.com/coolsnowwolf/lede/issues/7620
-# CONFIG_PACKAGE_kmod-qca-nss-ecm-noload is not set
-# CONFIG_PACKAGE_kmod-qca-nss-ecm-premium is not set
-# CONFIG_PACKAGE_kmod-qca-nss-ecm-premium-noload is not set
-# CONFIG_PACKAGE_kmod-qca-nss-ecm-standard is not set
 
 CONFIG_PACKAGE_ss=y
 CONFIG_PACKAGE_tc-full=y

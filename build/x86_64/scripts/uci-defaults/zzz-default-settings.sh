@@ -1,8 +1,19 @@
 opkg install /*_*_*.ipk
 rm -f /*_*_*.ipk
 
+# slim 固件本地 opkg 配置
+if ls -l /local_feed/*.ipk &>/dev/null;then
+    sed -ri 's@^[^#]@#&@' /etc/opkg/distfeeds.conf
+    grep -E '/local_feed' /etc/opkg/customfeeds.conf || echo 'src/gz local file:///local_feed' >> /etc/opkg/customfeeds.conf
+    # 取消签名，暂时解决不了
+    sed -ri '/check_signature/s@^[^#]@#&@' /etc/opkg.conf
+fi
+
 uci set  aliyundrive-webdav.@server[0].enable=0
 uci commit aliyundrive-webdav
+
+uci add_list system.ntp.server=120.25.115.20
+uci commit system
 
 uci set luci.main.mediaurlbase='/luci-static/argon_blue'
 uci commit luci
@@ -30,5 +41,5 @@ EOF
 uci set dhcp.@dnsmasq[0].rebind_protection='0'
 uci set dhcp.@dnsmasq[0].localservice='0'
 uci set dhcp.@dnsmasq[0].nonwildcard='0'
-uci set dhcp.@dnsmasq[0].server='223.5.5.5'
+uci add_list dhcp.@dnsmasq[0].server='223.5.5.5#53'
 uci commit dhcp

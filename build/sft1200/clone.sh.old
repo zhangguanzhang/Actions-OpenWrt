@@ -1,0 +1,16 @@
+git clone https://github.com/gl-inet/gl-infra-builder.git
+cd gl-infra-builder
+
+
+# git config --global user.email "action@github.com"
+# git config --global user.name "GitHub Action"
+
+python3 setup.py -c config-siflower-18.x.yml
+cd openwrt-18.06/siflower/openwrt-18.06/
+./scripts/gen_config.py target_siflower_gl-sft1200
+
+
+ln -sf  $PWD $GITHUB_WORKSPACE/openwrt
+
+
+echo "BaseDir=${PWD}" >> $GITHUB_ENV
