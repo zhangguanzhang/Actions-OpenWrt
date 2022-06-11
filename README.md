@@ -25,7 +25,7 @@ https://github.com/zhangguanzhang/Actions-OpenWrt/releases/tag/test
 
 1. r2s tf 卡推荐使用软件 `balenaEtcher-Portable` ，压缩包里是 img 的话会自动解压刷入，`x86_64` 在导入成硬盘后，给硬盘扩容，例如添加最少 2G 容量
 2. 配置好 wan 口（接上级路由做 dhcp 客户端还是 ppoe 拨号都行）或者你的 x86_64 单网口，确保路由器能上网
-3. ssh 上去执行 `bash -x /update.sh` ，如果升级失败，请提 issue 贴日志。
+3. ssh 上去执行 `bash -x /update.sh` ，如果升级失败，请提 issue 贴日志，r2s 升级死机的话可以试试升级过程物理降温。
 4. 默认密码均为 `password` ，路由器 ip 你可以电脑接它的 lan 后看网关 IP
 5. 初次升级的同时会扩容，**扩容完只有两个分区，剩余空间所有目录均可享用**，升级完后连上去，可以自行安装想要的软件源，例如下面
    1. `opkg update`

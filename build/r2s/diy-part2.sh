@@ -43,15 +43,6 @@ rm -rf package/custom; mkdir package/custom
 
 
 if [ "$repo_name" = 'lede' ];then
-    # https://github.com/coolsnowwolf/packages/issues/352
-    rm -f feeds/packages/utils/dockerd/files{/etc/config/dockerd,/etc/docker/daemon.json,/etc/init.d/dockerd}
-    SED_NUM=$( grep -n '^\s*/etc/config/dockerd' feeds/packages/utils/dockerd/Makefile | awk -F: '$0~":"{print $1}')
-    if [ -n "$SED_NUM" ];then
-        sed -ri "$[SED_NUM-1],$[SED_NUM+1]d" feeds/packages/utils/dockerd/Makefile
-    fi
-    sed -ri '\%/files/(daemon.json|dockerd.init|etc/config/dockerd)%d' feeds/packages/utils/dockerd/Makefile
-    sed -ri '\%\$\(INSTALL_DIR\) \$\(1\)/etc/(docker|init\.d|config)%d' feeds/packages/utils/dockerd/Makefile
-
     # https://github.com/coolsnowwolf/lede/issues/9483
     # https://github.com/coolsnowwolf/lede/pull/9457/files#diff-38a2e413df332b2dd0c3651ef57bd9544c2224faa0bf9fb7712daf769e12fa67L449-L470
     # https://github.com/coolsnowwolf/lede/commit/ee7d9cff629778e16d1a34abc04ea3d6524d56bb#diff-38a2e413df332b2dd0c3651ef57bd9544c2224faa0bf9fb7712daf769e12fa67R470
@@ -66,8 +57,18 @@ if [ "$repo_name" = 'lede' ];then
     sed -i 's/PKG_SOURCE_VERSION:=.*/PKG_SOURCE_VERSION:=master/' package/kernel/rtl8821cu/Makefile
     sed -i 's/PKG_MIRROR_HASH:=.*/PKG_MIRROR_HASH:=skip/' package/kernel/rtl8821cu/Makefile
 
-    # https://github.com/coolsnowwolf/packages/issues/466
-    cat ./feeds/luci/applications/luci-app-docker/root/etc/docker-init > ./feeds/luci/applications/luci-app-docker/root/etc/init.d/dockerd 
+    # # https://github.com/coolsnowwolf/packages/issues/352
+    # rm -f feeds/packages/utils/dockerd/files{/etc/config/dockerd,/etc/docker/daemon.json,/etc/init.d/dockerd}
+    # SED_NUM=$( grep -n '^\s*/etc/config/dockerd' feeds/packages/utils/dockerd/Makefile | awk -F: '$0~":"{print $1}')
+    # if [ -n "$SED_NUM" ];then
+    #     sed -ri "$[SED_NUM-1],$[SED_NUM+1]d" feeds/packages/utils/dockerd/Makefile
+    # fi
+    # sed -ri '\%/files/(daemon.json|dockerd.init|etc/config/dockerd)%d' feeds/packages/utils/dockerd/Makefile
+    # sed -ri '\%\$\(INSTALL_DIR\) \$\(1\)/etc/(docker|init\.d|config)%d' feeds/packages/utils/dockerd/Makefile
+    # # https://github.com/coolsnowwolf/packages/issues/466
+    # cat ./feeds/luci/applications/luci-app-docker/root/etc/docker-init > ./feeds/luci/applications/luci-app-docker/root/etc/init.d/dockerd 
+
+    find -type d -name luci-app-docker -exec rm -rvf {} \;
 fi
 
 # openwrt 的目录里没这目录
@@ -88,6 +89,13 @@ fi
     #rm -rf feeds/routing/cjdns /feeds/routing/luci-app-cjdns
     find -type d -name "*cjdns*" | grep -E '(/|luci-app-)cjdns' | xargs -r rm -rf 
 # fi
+
+if [ "$repo_name" = 'openwrt' ];then
+    # rm -rf package/network/services/dnsmasq
+    # svn export https://github.com/coolsnowwolf/lede/trunk/package/network/services/dnsmasq package/network/services/dnsmasq
+    # # openwrt 编译会默认打开 dnsmasq，而我的 .config 里会把 dnsmasq-full 打开
+    sed -ri 's/dnsmasq\s/dnsmasq-full /' include/target.mk
+fi
 
 
 # https://github.com/vernesong/OpenClash/issues/1930

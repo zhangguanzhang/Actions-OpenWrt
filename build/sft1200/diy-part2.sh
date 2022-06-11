@@ -27,9 +27,9 @@ sed -i "${SED_NUM}d " feeds/packages/lang/python/python3/Makefile
 
 
 
-svn export https://github.com/coolsnowwolf/lede/trunk/tools/upx   tools/upx
-svn export https://github.com/coolsnowwolf/lede/trunk/tools/ucl   tools/ucl
-svn export https://github.com/coolsnowwolf/lede/trunk/tools/ninja tools/ninja
+svn export --force https://github.com/coolsnowwolf/lede/trunk/tools/upx   tools/upx
+svn export --force https://github.com/coolsnowwolf/lede/trunk/tools/ucl   tools/ucl
+svn export --force https://github.com/coolsnowwolf/lede/trunk/tools/ninja tools/ninja
 
 
 # tools makefile 修改内容：
@@ -60,6 +60,7 @@ popd
 
 sed -ri '875i \\tset_default ieee80211r 1' package/network/services/hostapd/files/hostapd.sh
 
+rm -rf package/community
 mkdir package/community
 
 svn export https://github.com/kenzok8/openwrt-packages/trunk/luci-app-adguardhome package/community/luci-app-adguardhome
@@ -138,9 +139,10 @@ popd
 # popd
 
 rm -rf  feeds/packages/utils/bash
-svn export https://github.com/openwrt/packages/branches/master/utils/bash feeds/packages/utils/bash
+svn export --force https://github.com/openwrt/packages/branches/master/utils/bash feeds/packages/utils/bash
 # parted 
-svn export https://github.com/openwrt/packages/branches/master/utils/parted package/utils/parted
+[ -n "${GITHUB_RUN_NUMBER}" ] && rm -rf package/utils/parted
+svn export --force https://github.com/openwrt/packages/branches/master/utils/parted package/utils/parted
 
 
 

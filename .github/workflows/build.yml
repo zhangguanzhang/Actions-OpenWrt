@@ -94,6 +94,25 @@ jobs:
     # - name: install docker
     #   uses: docker-practice/actions-setup-docker@master
       
+    - name: Login to Docker Hub
+      uses: docker/login-action@v2
+      env:
+        DOCKER_PASS: ${{ secrets.DOCKER_PASS  }}
+      if: env.DOCKER_PASS != ''
+      with:
+        username: ${{ github.repository_owner }}
+        password: ${{ secrets.DOCKER_PASS }}
+
+    # - name: Login to registry.aliyuncs.com
+    #   uses: aliyun/acr-login@v1
+    #   env:
+    #     DOCKER_PASS: ${{ secrets.DOCKER_PASS  }}
+    #   if: env.DOCKER_PASS != ''
+    #   with:
+    #     login-server: https://registry.aliyuncs.com
+    #     username: "${{ github.repository_owner }}@qq.com"
+    #     password: "${{ secrets.DOCKER_PASS }}"
+
     - name: prinf machine info and matrix info
       run: |
         uname -a
@@ -127,8 +146,11 @@ jobs:
             bash init_runner.sh
         else
           sudo rm -rf /etc/apt/sources.list.d/* /usr/share/dotnet /usr/local/lib/android /opt/ghc
+          curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg | sudo dd of=/usr/share/keyrings/githubcli-archive-keyring.gpg
+          echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" | \
+            sudo tee /etc/apt/sources.list.d/github-cli.list > /dev/null
           sudo -E apt-get -qq update
-          sudo -E apt-get -qq install python3-markdown $(curl -fsSL git.io/depends-ubuntu-2004) zstd upx jq pv ccache
+          sudo -E apt-get -qq install $(curl -fsSL git.io/depends-ubuntu-2004) zstd upx jq pv ccache gh
           sudo -E apt-get -qq autoremove --purge
           sudo -E apt-get -qq clean
           sudo timedatectl set-timezone "$TZ"
@@ -136,15 +158,8 @@ jobs:
           # install github cli tool
           # gh 的 cli 用于构建缓存存储，这里加 env 判断防止 fork 的人不知道怎么设置而构建失败
           if [ -n "${{ secrets.gh_token }}" ];then
-            wget -q https://github.com/cli/cli/releases/download/v2.11.3/gh_2.11.3_linux_amd64.tar.gz
-            tar zxf gh_*_linux_amd64.tar.gz
-            find gh_* -type f -name gh -exec mv {} /usr/local/bin/ \;
-            rm -rf gh_*linux*
-            sudo chmod a+x /usr/local/bin/gh
+            gh --version
             echo ${{ secrets.gh_token }} | gh auth login --with-token
-          fi
-          if command -v docker &>/dev/null && [ -n "${DOCKER_PASS}" ];then
-            docker login -u ${{ github.repository_owner }} -p ${DOCKER_PASS}
           fi
         fi
 
@@ -273,6 +288,7 @@ jobs:
 
         # 有缓存存在才构建 imageBuilder，否则第一次生成缓存可能会很久甚至失败，此刻构建 imageBuilder 没有意义
         if grep -Eq '^CONFIG_IB=y'  openwrt/.config;then
+            echo 'USED_CONFIG_IB=true'  >> $GITHUB_ENV
             echo 'MAKE_OPTS=IGNORE_ERRORS=1' >> $GITHUB_ENV
             if [ "$CACHE" == true ];then
             # 缓存存在下，slim 和 full 版本的准备行为
@@ -301,6 +317,7 @@ jobs:
                 true
             fi
         else # 没开 imageBuilder 
+            echo 'USED_CONFIG_IB=false'  >> $GITHUB_ENV
             echo 'MAKE_OPTS=' >> $GITHUB_ENV
         fi
 
@@ -446,14 +463,18 @@ jobs:
         pwd
         rm -rf packages
         echo "FIRMWARE=$PWD" >> $GITHUB_ENV
-        # 没缓存，并且有固件生成，则上传
-        if [ `find -type f -size +5M | grep -Ev 'openwrt-imagebuilder' |wc -l` -ne 0 ] && [ "$CACHE" == false ] ;then
+        # 有固件生成，则上传
+        if [ `find -type f -size +5M | grep -Ev 'openwrt-imagebuilder' |wc -l` -ne 0 ];then
           echo "::set-output name=status::success"
         fi
 
         # 下面 outputs 是后面上传 imageBuidler 的判断条件和名字
         if ls *-imagebuilder-* &>/dev/null;then
-          echo "::set-output name=imageBuilder::openwrt-imagebuilder-${{ env.DEVICE_NAME }}-${{ matrix.repo.name }}-${{ matrix.repo.branch }}"
+          # # 避免以后其他的 repo 构建的默认就带 imagebuilder，例如 sft1200。上传 imageBuilder 但是不给后续的 slim/full 执行
+          echo "::set-output name=uploadImageBuilder::true"
+          if [ "$USED_CONFIG_IB" == true ];then
+              echo "::set-output name=imageBuilder::openwrt-imagebuilder-${{ env.DEVICE_NAME }}-${{ matrix.repo.name }}-${{ matrix.repo.branch }}"
+          fi
         else
           echo "no_imageBuilder=true" >> $GITHUB_ENV
         fi
@@ -478,7 +499,7 @@ jobs:
 
     - name: Upload imagebuilder tar.xz
       uses: actions/upload-artifact@main
-      if: steps.organize.outputs.imageBuilder && !cancelled()
+      if: steps.organize.outputs.uploadImageBuilder && !cancelled()
       with: # 上传 imageBuilder
         name: openwrt-imagebuilder-${{ env.DEVICE_NAME }}-${{ matrix.repo.name }}-${{ matrix.repo.branch }}
         path: ${{ env.FIRMWARE }}/*-imagebuilder*
@@ -570,16 +591,18 @@ jobs:
           # done
           # sudo umount cache
           sleep 1
-          sudo mount -o remount,compress=no,nodatacow,nodatasum openwrt
+          sudo mount -o remount,compress=no,nodatacow,nodatasum  /workdir/openwrt #openwrt
           # https://github.com/klever1988/nanopi-openwrt/issues/1158
           pv /dev/zero > openwrt/zerospace || true
           sync
           rm -f openwrt/zerospace || true
           sleep 5
-          sudo umount -f openwrt
+          sudo umount -f /workdir/openwrt #openwrt
           sleep 2
           # sudo losetup -l -O NAME -n | awk '$0~"/'${cache_name}'.img"{print $1}' | xargs -r sudo losetup -d
-          sudo losetup -d $LOOP_DEVICE
+          sudo losetup -l -O NAME -n | grep -Eqw $LOOP_DEVICE && sudo losetup -d $LOOP_DEVICE
+          # 偶尔消失，所以上面的判断
+          #sudo losetup -d $LOOP_DEVICE
           sync
           zstdmt -c --long ${cache_name}.img | split --numeric=1 -b 2000m - ${cache_name}.img.zst.
           ls -l
@@ -638,34 +661,45 @@ jobs:
         DEBIAN_FRONTEND: noninteractive
       run: |
         sudo rm -rf /etc/apt/sources.list.d/* /usr/share/dotnet /usr/local/lib/android /opt/ghc
+        curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg | sudo dd of=/usr/share/keyrings/githubcli-archive-keyring.gpg
+        echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" | \
+          sudo tee /etc/apt/sources.list.d/github-cli.list > /dev/null
         sudo -E apt-get -qq update
-        sudo -E apt-get -qq install python3-markdown $(curl -fsSL git.io/depends-ubuntu-2004) jq rename
+        sudo -E apt-get -qq install git gh gawk unzip patch autoconf automake upx wget curl rsync jq rename 
         sudo -E apt-get -qq autoremove --purge
         sudo -E apt-get -qq clean
         sudo timedatectl set-timezone "$TZ"
         sudo mkdir -p /workdir
         sudo chown $USER:$GROUPS /workdir
-        i=0
-        while [ "$i" -le 100 ];do
-          if command -v docker &>/dev/null && [ -n "${DOCKER_PASS}" ];then
-            docker info | grep -wq '${{ github.repository_owner }}'  || docker login -u ${{ github.repository_owner }} -p ${DOCKER_PASS}
-            docker login -u ${{ github.repository_owner }}@qq.com -p ${DOCKER_PASS} registry.aliyuncs.com
-            [ "$?" -eq 0 ] && break || lei i++
-          fi
-        done
         docker info
 
         # install github cli tool
         # 上传到latest分支
         if [ -n "${{ secrets.gh_token }}" ];then
-          wget -q https://github.com/cli/cli/releases/download/v2.11.3/gh_2.11.3_linux_amd64.tar.gz
-          tar zxf gh_*_linux_amd64.tar.gz
-          find gh_* -type f -name gh -exec mv {} /usr/local/bin/ \;
-          rm -rf gh_*linux*
-          sudo chmod a+x /usr/local/bin/gh
+          gh --version
           echo ${{ secrets.gh_token }} | gh auth login --with-token
           echo "::set-output name=gh::success"
         fi
+
+    - name: Login to Docker Hub
+      uses: docker/login-action@v2
+      env:
+        DOCKER_PASS: ${{ secrets.DOCKER_PASS  }}
+      if: env.DOCKER_PASS != ''
+      with:
+        username: ${{ github.repository_owner }}
+        password: ${{ secrets.DOCKER_PASS }}
+
+    - name: Login to registry.aliyuncs.com
+      uses: aliyun/acr-login@v1
+      env:
+        DOCKER_PASS: ${{ secrets.DOCKER_PASS  }}
+      if: env.DOCKER_PASS != ''
+      continue-on-error: true
+      with:
+        login-server: https://registry.aliyuncs.com
+        username: "${{ github.repository_owner }}@qq.com"
+        password: "${{ secrets.DOCKER_PASS }}"
 
     - name: Download imagebuilder (Artifact)
       uses: actions/download-artifact@v2
@@ -764,6 +798,7 @@ jobs:
 
         prename -v "s#^.+${name_str_target}#${{ matrix.repo.name }}-${{ matrix.repo.branch }}-${{ needs.build.outputs.build_target }}${suffix}#" *${name_str_target}*
         mv sha256sums ${{ matrix.repo.name }}-${{ matrix.repo.branch }}-${{ needs.build.outputs.build_target }}${suffix}-sha256sums
+        [ -f profiles.json ] && mv profiles.json ${{ matrix.repo.name }}-${{ matrix.repo.branch }}-${{ needs.build.outputs.build_target }}${suffix}-profiles.json
         ls -l
         [ ${GITHUB_REF##*/} = 'main' ] && tag=latest || tag=test
         gh release -R ${GITHUB_REPOSITORY} list | grep -Ew ${tag} || gh release -R ${GITHUB_REPOSITORY} create ${tag} -t '' -n ''
