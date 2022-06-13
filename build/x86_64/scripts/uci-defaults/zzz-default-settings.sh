@@ -1,3 +1,14 @@
+#!/bin/sh
+
+# Change default shell to bash
+if [ -f /bin/bash ];then
+  sed -i '/^root:/s#/bin/ash#/bin/bash#' /etc/passwd
+fi
+# 同时开 bash 和 zsh 的话有上面优先
+if [ -f /bin/zsh ];then
+  sed -i '/^root:/s#/bin/ash#/bin/zsh#' /etc/passwd
+fi
+
 opkg install /*_*_*.ipk
 rm -f /*_*_*.ipk
 
@@ -25,6 +36,9 @@ if [ -f /etc/config/qbittorrent ];then
     uci set qbittorrent.main.AnnounceToAllTrackers='true'
     uci commit qbittorrent
 fi
+
+touch /etc/crontabs/root
+chmod 0600 /etc/crontabs/root
 
 # 允许 wan ssh
 uci delete dropbear.@dropbear[0].Interface

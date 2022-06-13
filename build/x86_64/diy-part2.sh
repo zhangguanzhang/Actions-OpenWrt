@@ -38,12 +38,57 @@ function merge_package(){
 }
 
 
-# 修改默认主题
+# Modify default theme
 # https://github.com/jerrykuku/luci-theme-argon/tree/18.06
 # https://github.com/kenzok8/openwrt-packages
-sed -ri 's/luci-theme-\S+/luci-theme-argonne/g' feeds/luci/collections/luci/Makefile  # feeds/luci/modules/luci-base/root/etc/config/luci
+if [ "$repo_name" = 'lede' ];then
+    sed -ri 's/luci-theme-\S+/luci-theme-argonne/g' feeds/luci/collections/luci/Makefile  # feeds/luci/modules/luci-base/root/etc/config/luci
+fi
+
+if [ "$repo_name" = 'openwrt' ];then
+    # rm -rf package/network/services/dnsmasq
+    # svn export https://github.com/coolsnowwolf/lede/trunk/package/network/services/dnsmasq package/network/services/dnsmasq
+    # # openwrt 编译会默认打开 dnsmasq，而我的 .config 里会把 dnsmasq-full 打开
+    sed -ri 's/dnsmasq\s/dnsmasq-full /' include/target.mk
+
+    # 天灵还没办法编译成功，openwrt 官方的主题必须 luci-theme-argon 这种 21 分支的主题
+    sed -ri 's/luci-theme-\S+/luci-theme-argon/g' feeds/luci/collections/luci/Makefile
+    sed -i 's/argonne=y/argon=y/' .config
+    # 这个不兼容 openwrt 
+    find -type d -name 'luci-*-argonne*' -exec rm -rf {} \;
+
+    sed -i 's/\+IPV6:luci-proto-ipv6//' feeds/luci/collections/luci/Makefile
+
+    svn export https://github.com/immortalwrt/immortalwrt/trunk/package/emortal/autocore   package/emortal/autocore
+    svn export https://github.com/immortalwrt/immortalwrt/trunk/package/emortal/ipv6-helper   package/emortal/ipv6-helper
+
+    cat > package/base-files/files/etc/uci-defaults/zzz-default-settings <<'EOF'
+# 默认密码 password
+# sed -i 's/root::0:0:99999:7:::/root:$1$V4UetPzk$CYXluq4wUazHjmCDBCqXF.:0:0:99999:7:::/g' /etc/shadow
+sed -i '/^root::/c root:$1$V4UetPzk$CYXluq4wUazHjmCDBCqXF.:0:0:99999:7:::' /etc/shadow
+EOF
+    echo 'CONFIG_LUCI_LANG_zh_Hans=y' >> .config
+fi
 
 rm -rf package/custom; mkdir package/custom
+
+# 'package/feeds/others/luci-app-unblockneteasemusic/Makefile' has a dependency on 'ucode'
+[ ! -d package/utils/ucode ] && svn export https://github.com/coolsnowwolf/lede/trunk/package/utils/ucode  package/utils/ucode
+
+# rtl8812bu
+rm -rf package/kernel/rtl88x2bu
+git clone --depth=1 -b openwrt-21.02 https://github.com/erintera/openwrt-rtl8812bu-package.git package/kernel/rtl88x2bu
+echo 'CONFIG_PACKAGE_kmod-rtl88x2bu=y' >> .config
+
+# openwrt 的目录里没这目录
+# https://github.com/coolsnowwolf/lede/issues/3462
+[ ! -d tools/upx ] && svn export https://github.com/coolsnowwolf/lede/trunk/tools/upx   tools/upx
+[ ! -d tools/ucl ] && svn export https://github.com/coolsnowwolf/lede/trunk/tools/ucl   tools/ucl
+if ! grep -q upx tools/Makefile;then
+    SED_NUM=$(awk '$1=="tools-y"{a=NR}$1~/tools-\$/{print a;exit}' tools/Makefile)
+    sed -ri "${SED_NUM}a tools-y += ucl upx" tools/Makefile
+    sed -ri '/dependencies/a $(curdir)/upx/compile := $(curdir)/ucl/compile' tools/Makefile
+fi
 
 # https://github.com/coolsnowwolf/luci/issues/127
 [ -d package/lean/luci-app-filetransfer ] && sed -i '2a [ ! -f /etc/openwrt_release ] && exit 0' package/lean/luci-app-filetransfer/root/etc/uci-defaults/luci-filetransfer
@@ -87,7 +132,6 @@ if [ "$repo_name" = 'lede' ];then
     # sed -ri '\%\$\(INSTALL_DIR\) \$\(1\)/etc/(docker|init\.d|config)%d' feeds/packages/utils/dockerd/Makefile
     
     rm -rf ./feeds/luci/applications/luci-app-docker
-
 fi
 
 # /tmp/resolv.conf.d/resolv.conf.auto

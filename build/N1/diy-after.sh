@@ -24,6 +24,12 @@ if [ -z "$KERNEL_VERSION" ];then
         grep -Pom1 "^opt/kernel/${KERNEL_VERSION%%-*}/boot-\K.+?(?=.tar.gz)")
     if [ -n "$DOWNLOAD_KERNEL_VERSION" ];then
         export KERNEL_VERSION="$DOWNLOAD_KERNEL_VERSION"
+    else
+        kernel_num=${KERNEL_VERSION%%-*} # 5.x.x
+        kerrnel_major=${kernel_num%.*} #5.18 
+        export KERNEL_VERSION=$(curl -s  https://api.github.com/repos/breakings/OpenWrt/git/trees/main?recursive=1 | \
+        jq -r '.tree[].path' | \
+        grep -Pom1 "^opt/kernel/${kerrnel_major}\.\d+/boot-\K.+?(?=.tar.gz)" )
     fi
 fi
 # 下面的 mk_s905d_n1.sh 里会执行 source 它
@@ -31,7 +37,7 @@ fi
 
 export kernel_URL=https://raw.githubusercontent.com/breakings/OpenWrt/main/opt/kernel
 
-export kernel_VER=${KERNEL_VERSION%%-*}
+export kernel_VER=${KERNEL_VERSION%%-*} # 5.13.13
 export KERNEL_VERSION=$KERNEL_VERSION
 # KERNEL_VERSION="5.13.13-flippy-63+"
 (

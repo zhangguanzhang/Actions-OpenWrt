@@ -1,3 +1,13 @@
+#!/bin/sh
+
+# Change default shell to bash
+if [ -f /bin/bash ];then
+  sed -i '/^root:/s#/bin/ash#/bin/bash#' /etc/passwd
+fi
+# 同时开 bash 和 zsh 的话有上面优先
+if [ -f /bin/zsh ];then
+  sed -i '/^root:/s#/bin/ash#/bin/zsh#' /etc/passwd
+fi
 
 # ipk
 opkg install /root/ipks/*_*_*.ipk

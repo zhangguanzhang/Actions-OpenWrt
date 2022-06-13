@@ -6,9 +6,10 @@
 set -e
 
 # FSTYPE=ext4,squashfs
-: ${IM_BRANCH:=master}
+: ${IM_BRANCH:=}
 : ${SKIP_BACK:=false} ${DEBUG:=false}
 : ${TEST:=false} # 默认使用 main 分支编译的，test分支是测试阶段
+: ${REPO:=} # lede openwrt
 
 tmp_mountpoint=/opt
 
@@ -85,7 +86,7 @@ function init_d_stop(){
 # 从 ghproxy 下载
 function registry_api_setting(){
     local target=$1 realm service scope url
-    curl -L https://${repo_domain}/v2/${repo_namespace}/${target}/tags/list -v 2>&1 | awk '/Www-Authenticate/{print $4}' | sed 's/,/\n/g' > /tmp/registr_realm
+    curl -L https://${repo_domain}/v2/${repo_namespace}/${target}/tags/list -v 2>&1 |  awk 'tolower($2)~"www-authenticate"{print $4}' | sed 's/,/\n/g' > /tmp/registr_realm
     source /tmp/registr_realm
     url="${realm}?service=${service}&scope=${scope}"
     # https://stackoverflow.com/questions/35018899/using-curl-in-a-bash-script-and-getting-curl-3-illegal-characters-found-in-ur
@@ -120,21 +121,26 @@ function registry_blob_download_op(){
     rm -f /tmp/registr_*
 }
 
-# function docker_download_op(){
-#     local img_name=$1
-#     info "开始从 dockerhub 下载包含固件的 docker 镜像，如果拉取失败，可以自己手动 docker pull ${img_name}"
-#     docker pull ${img_name}
-#     CTR_PATH=$( docker inspect ${img_name} --format '{{ .Config.Labels }}' | grep -Eo 'openwrt-.+img.gz' )
-#     info "开始从 docker 镜像里提取固件的 tar.gz 压缩文件到: ${USER_FILE}"
-#     docker create --name update ${img_name}
-#     docker cp update:/${CTR_PATH} ${USER_FILE}
-#     docker cp update:/sha256sums /tmp/
-#     docker rm update
-#     IMG_EXIST=1
-# }
+function r1s-h3(){
+    #part_prefix=p
+    tmp_mountpoint_end_size=2600MB
+    first_grow_condition_size=1800
+    blob_layer_reg_str=r1s-h3
+    # [ ! -d /sys/block/$block_device ] && block_device='mmcblk1'
+    update
+}
+
+function r1s-h5(){
+    #part_prefix=p
+    tmp_mountpoint_end_size=2600MB
+    first_grow_condition_size=1800
+    blob_layer_reg_str=r1s-h5
+    # [ ! -d /sys/block/$block_device ] && block_device='mmcblk1'
+    update
+}
 
 function r2s(){
-    part_prefix=p
+    #part_prefix=p
     tmp_mountpoint_end_size=2600MB
     first_grow_condition_size=1800
     blob_layer_reg_str=r2s
@@ -142,11 +148,29 @@ function r2s(){
     update
 }
 
+function r4s(){
+    #part_prefix=p
+    tmp_mountpoint_end_size=2600MB
+    first_grow_condition_size=1800
+    blob_layer_reg_str=r4s
+    # [ ! -d /sys/block/$block_device ] && block_device='mmcblk1'
+    update
+}
+
+function doornet2(){
+    #part_prefix=p
+    tmp_mountpoint_end_size=2600MB
+    first_grow_condition_size=1800
+    blob_layer_reg_str=doornet2
+    # [ ! -d /sys/block/$block_device ] && block_device='mmcblk1'
+    update
+}
+
 function x86_64(){
-    part_prefix=''
+    #part_prefix=''
     tmp_mountpoint_end_size=2400MB
     first_grow_condition_size=1500
-    blob_layer_reg_str=x86-64
+    blob_layer_reg_str=x86_64
     update
 }
 
@@ -219,25 +243,30 @@ function update(){
     if [ -f "${USER_FILE}" ];then
         info "此次使用本地文件: ${USER_FILE} 来升级"
     else
-        REPO=lede
-        # lede immortalwrt openwrt 的 os-release 都包含 lede，非 lede 判断放后面
-        #grep -qw 'immortalwrt' /etc/os-release && REPO=immortalwrt
-        # lede 的 /etc/openwrt_release 里 DISTRIB_REVISION 是大 R 开头，openwrt 里是小 r 开头
-        #if [ "$REPO" != 'immortalwrt' ] &&  grep -Eq "DISTRIB_REVISION='r" /etc/openwrt_release;then
-        #    REPO=openwrt
-        #fi
+
+        registry_tag_list ${board_id}  |  jsonfilter -e '@["tags"][*]' > /tmp/registr_list
 
         if [ "${TEST}" != false ];then
             IMG_TAG=latest-${FSTYPE}${VER}-${REPO}-${IM_BRANCH}
         else
             # dockerhub jsonfilter -e '@["results"][*].name'
-            IMG_TAG=$(registry_tag_list ${board_id}  | \
-                jsonfilter -e '@["tags"][*]' | grep -E release | sort -rn | head -n1)
+            IMG_TAG=$(grep -E release /tmp/registr_list | sort -rn | grep '${FSTYPE}${VER}-${REPO}' | grep ${IM_BRANCH} | head -n1)
         fi
         # 没合并到 master 上暂时使用测试固件
         [ -z "${IMG_TAG}" ] && IMG_TAG=latest-${FSTYPE}${VER}-${REPO}-${IM_BRANCH}
+        
+        # 部分源码的 branch 带 openwrt- 前缀，IM_BRANCH 获取到的是数字
+        # 这里查找下确认镜像存在否
+        IMG_TAG_prefix=$(echo ${IMG_TAG} | sed "s/-${IM_BRANCH}//" )
+        IMG_TAG=$(grep $IMG_TAG_prefix /tmp/registr_list  | grep $IM_BRANCH)
+
+        [ -z "$IMG_TAG" ] && err "没有查询到可用镜像，分支是否有误"
 
         if [ ! -f "${USER_FILE}" ];then
+            if [ -f ${USER_FILE}.tar.gz ] && [ ! -f ${tmp_mountpoint}/sha256sums ] && [ ! -f /tmp/sha256sums ];then
+                # 下载 layer 被中断，删除掉走下面的下载逻辑
+                rm -f ${USER_FILE}.tar.gz
+            fi
             if [ ! -f  ${USER_FILE}.tar.gz ];then
                 registry_blob_download_op ${board_id} ${IMG_TAG}
             fi
@@ -259,6 +288,7 @@ function update(){
     if [ -f /tmp/sha256sums ];then
         [ -z "$check_file" ] && check_file=$USER_FILE
         file_sum=`sha256sum ${check_file} | awk '{print $1}'`
+        # 直接查 hash 字符串，不管文件名
         if ! grep -Eq "${file_sum}" /tmp/sha256sums;then
             rm -f ${USER_FILE}
             err '文件校验失败，文件可能损坏，请再次重试'
@@ -321,7 +351,7 @@ function update(){
     # TODO
     # 当前主题写入
     echo 'opkg update' > /mnt/update/img/packages_needed
-    opkg list-installed | grep -E "luci-(i18n|app)-" | cut -d ' '  -f1 | \
+    opkg list-installed | grep -E "luci-(i18n|app|proto)-|kmod-fs-" | cut -d ' '  -f1 | \
         sort -r | xargs -n1 echo opkg install --force-overwrite >> /mnt/update/img/packages_needed
 
     if [ "$SKIP_BACK" != false ] || [ -n "$NEED_GROW" ] ;then
@@ -353,14 +383,32 @@ function update(){
     if [ "$IMG_FSTYPE" = 'squashfs' ];then
         proceed_command unsquashfs squashfs-tools-unsquashfs
         proceed_command mksquashfs squashfs-tools-mksquashfs
+
+        if [ -z "$(mksquashfs --help 2>&1 | awk 'a>0{a++}/Compressors available:/{a=1}a>0&&a<5&&$1=="xz"{print 1}')" ];then
+            warning "squashfs-tools-mksquashfs 的 mksquashfs 不支持 xz 压缩，继续打包可能存在无法开机的情况"
+            read -p "继续或者退出 (y/n)?" choice
+            case "$choice" in 
+                y|Y ) choice=1;;
+                n|N ) choice=0;;
+                * ) choice=0;;
+            esac 
+            if [ "$choice" = 0 ];then
+                exit 2
+            fi
+        fi
+
         info "开始打包 squashfs 文件系统，请耐心等待"
         unsquashfs -s ${lodev}p2 &> squashfs.info
         comp=$(awk '$1=="Compression"{print $2}' squashfs.info)
+        comp="-comp ${comp}"
+        # 压缩可能用不了
+        grep -qw 'xz compression is not supported' squashfs.info && comp=''
         sq_block_size=$(awk '$1=="Block"{print $NF}' squashfs.info)
-        xattrs='-xattrs' # CONFIG_SELINUX=y
+        xattrs='' # CONFIG_SELINUX=y # xattrs='-xattrs'
         grep -Eq 'Xattrs.+?not' squashfs.info && xattrs='-no-xattrs'
         # nmbd samba 
-        init_d_stop netdata snmpd ttyd vsftpd nmbd dockerd
+        init_d_stop netdata snmpd vsftpd nmbd dockerd
+        init_d_stop ttyd 2>/dev/null # op官方的 ttyd 脚本貌似有问题
         # mksquashfs 吃内存和缓存，导出的文件不能放 tmp 目录下，此处也调整父级进程 oom_score_adj 防止 oom
         echo -998 > /proc/$$/oom_score_adj 2>/dev/null || true
         # 
@@ -397,7 +445,7 @@ function update(){
         # 注意，x86_64的 mksquashfs4 是源码打了patch后编译的，多了 -Xpreset 9 -Xe -Xlc 0 -Xlp 2 -Xpb 2 这些选项
         # LZMA_XZ_OPTIONS='-Xpreset 9 -Xe -Xlc 0 -Xlp 2 -Xpb 2'
         mksquashfs /mnt/update/img /opt/op.squashfs -nopad -noappend -root-owned \
-            -comp ${comp} ${LZMA_XZ_OPTIONS} \
+            ${comp} ${LZMA_XZ_OPTIONS} \
             -b $[sq_block_size/1024]k \
             -p '/dev d 755 0 0' -p '/dev/console c 600 0 0 5 1' \
             $xattrs -mem 20M 
@@ -478,8 +526,10 @@ function auto_set_block_var(){
     [ -z "$rootfs_part" ] && err "自动获取根分区所在块设备失败"
     #for block in `ls -l /dev/ | awk '$1~/^br/&&$NF!~/loop|ram/{print $NF}'`;do
     for block in `ls -1 /sys/block/ | grep -Ev 'loop|ram'`;do
-        if echo ${rootfs_part} | grep -Eq $block;then
+        if echo ${rootfs_part} | grep -Eq $block &&  [ "$rootfs_part" != "$block" ];then
             block_device=$block
+            # 去掉结尾的数字，取
+            part_prefix=$( echo ${rootfs_part/$block/}| sed 's#[0-9]$##' )
             return
         fi
     done
@@ -513,12 +563,49 @@ function main(){
 
     [ "$TEST" = true ] && release_name=test || release_name=latest
 
-    board_id=$(jsonfilter -e '@["model"].id' < /etc/board.json | \
-        sed -r -e 's/friendly.*,nanopi-//' )
-    arch=`uname -m`
-    [ $arch == 'x86_64' ] && board_id='x86_64'
+    [ -f /etc/openwrt_release ] && source /etc/openwrt_release
+    if [ -z "$MATRIX_TARGET" ];then
+        board_id=$(jsonfilter -e '@["model"].id' < /etc/board.json | \
+            sed -r -e 's/friendly.*,nanopi-//' )
+        arch=`uname -m`
+        [ $arch == 'x86_64' ] && board_id='x86_64'
+    else
+        board_id="$MATRIX_TARGET"
+    fi
 
     type -t $board_id 1>/dev/bull || err "暂不支持该设备: ${board_id}"
+
+    if [ -z "$REPO" ];then
+        if [ -z "$MATRIX_REPO_NAME" ];then
+            REPO=lede
+            # lede immortalwrt openwrt 的 os-release 都包含 lede，非 lede 判断放后面
+            #grep -qw 'immortalwrt' /etc/os-release && REPO=immortalwrt
+            # lede 的 /etc/openwrt_release 里 DISTRIB_REVISION 是大 R 开头，openwrt 里是小 r 开头
+            if [ "$REPO" != 'immortalwrt' ] &&  grep -Eq "DISTRIB_REVISION='r" /etc/openwrt_release;then
+                REPO=openwrt
+            fi
+        else
+            REPO=$MATRIX_REPO_NAME
+        fi
+    fi
+
+    if [ -z "$IM_BRANCH" ];then
+        if [ -z "$MATRIX_REPO_BRANCH" ];then
+            # awk -F"[-=.']" '$1=="DISTRIB_RELEASE"&& $3!="SNAPSHOT"{printf "%s.%s\n",$3,$4}'
+            IM_BRANCH=$(awk -F"[-=']" '$1=="DISTRIB_RELEASE"&& $3!="SNAPSHOT"{print $3}' /etc/openwrt_release 2>/dev/null)
+            [ -z "$IM_BRANCH" ] && IM_BRANCH=master
+        else
+            IM_BRANCH=$MATRIX_REPO_BRANCH
+        fi
+    fi
+
+    proceed_command parted
+    proceed_command losetup
+    proceed_command resize2fs
+    proceed_command truncate coreutils-truncate
+    proceed_command curl
+    proceed_command wget
+    proceed_command lsblk
 
     # 不存在本地文件离线升级，并且没网就退出
     if [ ! -f "$USER_FILE" ];then
@@ -529,13 +616,8 @@ function main(){
     fi
     auto_set_block_var
 
-    proceed_command parted
-    proceed_command losetup
-    proceed_command resize2fs
-    proceed_command truncate coreutils-truncate
-    proceed_command curl
-    proceed_command wget
-    proceed_command lsblk
+    # 自带的 dd 不行
+    [ ! -f /usr/libexec/dd-coreutils ] && opkg install coreutils-dd
 
     $board_id
 }

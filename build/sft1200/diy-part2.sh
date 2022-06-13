@@ -1,6 +1,7 @@
 # 关闭 led 
 # i2cset  -f -y 0 0x30 0x04 0x00
 
+[ -n "${GITHUB_WORKSPACE}" ] && > ${GITHUB_WORKSPACE}/common/common.buildinfo
 
 # https://github.com/openwrt/packages/pull/8477/files
 if grep -wq '../perl/perlver.mk' feeds/packages/lang/perl/perlmod.mk;then
@@ -47,13 +48,12 @@ fi
 
 sed -ri '/foreach tool.+?\/ccache\/compile/s#xz patch,#xz patch ninja,#' tools/Makefile
 
-
 # https://github.com/gl-inet/gl-feeds/issues/2 
-
 pushd feeds/gl/libgpg-error/patches/
 [ ! -f 020-gawk5-support.patch ] &&  wget https://raw.githubusercontent.com/openwrt/packages/openwrt-18.06/libs/libgpg-error/patches/020-gawk5-support.patch
 [ ! -f 021-gawk5-support1.patch ] && wget https://raw.githubusercontent.com/openwrt/packages/openwrt-18.06/libs/libgpg-error/patches/021-gawk5-support1.patch
 popd
+
 
 # GL.iNet SFT1200 不能中继kvr无线信号的解决方法
 # https://www.right.com.cn/forum/thread-7481630-1-1.html
@@ -114,6 +114,7 @@ fi
 
 popd
 
+
 rm -rf feeds/packages/lang/node
 svn export https://github.com/openwrt/packages/branches/master/lang/node   feeds/packages/lang/node
 # adg 需要，但是貌似不用也行
@@ -123,14 +124,25 @@ rm -rf feeds/packages/lang/golang
 #svn export https://github.com/openwrt/packages/branches/master/lang/golang feeds/packages/lang/golang
 svn checkout https://github.com/openwrt/packages/trunk//lang/golang feeds/packages/lang/golang
 
+echo "5: $PWD"
+
 # luci-app-ttyd 相关
 rm -rf  feeds/packages/utils/ttyd
 svn export https://github.com/openwrt/packages/branches/master/utils/ttyd feeds/packages/utils/ttyd
-svn export https://github.com/coolsnowwolf/luci/branches/master/applications/luci-app-ttyd feeds/luci/applications/luci-app-ttyd
+# 下面俩是因为 github action 有几率无法拉取
+svn export https://github.com/coolsnowwolf/luci/trunk/applications/luci-app-ttyd feeds/luci/applications/luci-app-ttyd
+[ ! -d feeds/luci/applications/luci-app-ttyd ] && \
+  svn export https://github.com/coolsnowwolf/luci/branches/master/applications/luci-app-ttyd feeds/luci/applications/luci-app-ttyd
+
 # 不创建软链，列表会没有它
+mkdir -p package/feeds/luci/
 pushd package/feeds/luci/
 ln -sf ../../../feeds/luci/applications/luci-app-ttyd luci-app-ttyd
 popd
+
+echo "6: $PWD"
+
+ls -l . package package/feeds package/feeds/luci/
 
 # 用不了貌似，缺很多依赖
 # svn export https://github.com/coolsnowwolf/luci/branches/master/applications/luci-app-turboacc feeds/luci/applications/luci-app-turboacc
@@ -239,17 +251,20 @@ case "$ACTION" in
         if [ -L /sys/class/net/usb0 ];then
             ip link set usb0 up
             udhcpc -i usb0
-            sleep 1
+            #sleep 1
+            key_name=ifname
+            uci show network.loopback | grep -Eq '\.device=' && key_name=device
             uci set network.mobile=interface
             uci set network.mobile.proto='dhcp'
-            uci set network.mobile.ifname='usb0'
+            uci set network.mobile.${key_name}='usb0'
             # 设置本机 dns 好像会 loop
             # op_local_ip=$(ip r s | grep -Ev 'docker|usb0' | awk '$0~"src"{print $NF}')
             # uci set network.mobile.dns="${op_local_ip}"
-            uci delete network.mobile.dns
+            uci show network.mobile.dns  2>/dev/null && uci delete network.mobile.dns || true
 
             uci commit network
-            sleep 1
+            #sleep 1
+            ifup mobile
 
             wan_zone_network=$(uci get firewall.@zone[1].network)
 
@@ -258,7 +273,7 @@ case "$ACTION" in
                 uci commit firewall
             fi
             if ! grep -Eq '^\s*nameserver ' /etc/resolv.conf;then
-                echo 'nameserver 127.0.0.1' >> /etc/resolv.conf
+                echo 'nameserver 127.0.0.1 # sed-for-rndis' >> /etc/resolv.conf
             fi
         fi
         ;;
@@ -478,3 +493,6 @@ echo -e " zgz built on "$(TZ=Asia/Shanghai date '+%Y.%m.%d %H:%M') - ${GITHUB_RU
 # 		procd_close_instance
 # 	fi
 # }
+
+
+./scripts/feeds install -a
