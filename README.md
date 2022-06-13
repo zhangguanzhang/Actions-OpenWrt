@@ -2,13 +2,21 @@
 
 ### 支持的设备列表
 
-1. `r2s`
-2. `x86_64`
-3. `sft1200`
-4. `k2p`
-5. `N1`
+lede 只有 master 分支，op 目前只有官方的 openwrt-21.02 分支看是能用的地步
 
-`r2s` 和 `x86_64` 的固件经过测试，推荐使用 `slim-squashfs` 本地源的版本，可以在下面 `latest` 或者 `test` 的 release 下载：
+|  设备   | 支持的 源码-分支 列表  | 可脚本在线升级 | slim本地源 |  备注 |
+|  ------ | ------------------  | -------  |----  | ----  |
+| x86_64  | [lede](https://github.com/coolsnowwolf/lede)、[op](https://github.com/openwrt/openwrt/tree/openwrt-21.02) | ✔ | ✔ | |
+| r2s  | [lede](https://github.com/coolsnowwolf/lede)、[op](https://github.com/openwrt/openwrt/tree/openwrt-21.02)、[DHDAXCW](https://github.com/DHDAXCW/op-rockchip/tree/stable) | ✔ | ✔ | 骷髅头 DHDAXCW 支持usb wifi 不死机 | 
+| r4s  | [lede](https://github.com/coolsnowwolf/lede)、[op](https://github.com/openwrt/openwrt/tree/openwrt-21.02)、、[DHDAXCW](https://github.com/DHDAXCW/op-rockchip/tree/stable) | ✔ | ✔ | 天灵的还有点问题 |
+| r1s-h3  | [lede](https://github.com/coolsnowwolf/lede) | ✔ | ✔ | 暂时没添加其他源码 | 
+| doornet2  | [lede](https://github.com/coolsnowwolf/lede) | ✔ | ✔ | 暂时没添加其他源码 |
+| N1  | [lede](https://github.com/coolsnowwolf/lede) |  x | x | 暂时没空适配在线升级扩容和slim | 
+| k2p  | [lede](https://github.com/coolsnowwolf/lede) |  x | x | 暂时没空适配在线升级扩容和slim | 
+| sft1200  | [Siflower](https://github.com/Siflower/1806_SDK.git) |  x | x | 暂时没空适配在线升级扩容和slim | 
+
+
+推荐使用 `slim-squashfs` 本地源的版本，可以在下面 `latest` 或者 `test` 的 release 下载：
 
 ```
 https://github.com/zhangguanzhang/Actions-OpenWrt/releases/tag/latest
@@ -21,20 +29,20 @@ https://github.com/zhangguanzhang/Actions-OpenWrt/releases/tag/test
 
 ### 在线升级
 
-目前 `r2s` 和 `x86_64` 的固件可以在线升级，但是要求：内存大于等于 1G，容量大于等于 3G，升级步骤为下：
+在线升级的要求：内存大于等于 1G，容量大于等于 3G，升级步骤为下：
 
-1. r2s tf 卡推荐使用软件 `balenaEtcher-Portable` ，压缩包里是 img 的话会自动解压刷入，`x86_64` 在导入成硬盘后，给硬盘扩容，例如添加最少 2G 容量
+1. tf 卡推荐使用软件 `balenaEtcher-Portable` ，压缩包里是 img 的话会自动解压刷入，`x86_64` 在导入成硬盘后，给硬盘扩容，例如添加最少 2G 容量
 2. 配置好 wan 口（接上级路由做 dhcp 客户端还是 ppoe 拨号都行）或者你的 x86_64 单网口，确保路由器能上网
-3. ssh 上去执行 `bash -x /update.sh` ，如果升级失败，请提 issue 贴日志，r2s 升级死机的话可以试试升级过程物理降温。
+3. 电脑(不要ttyd上升级) ssh 上去执行 `bash -x /update.sh` ，如果升级失败，请提 issue 贴日志，arm64 之类的升级死机的话可以试试升级过程物理降温。
 4. 默认密码均为 `password` ，路由器 ip 你可以电脑接它的 lan 后看网关 IP
 5. 初次升级的同时会扩容，**扩容完只有两个分区，剩余空间所有目录均可享用**，升级完后连上去，可以自行安装想要的软件源，例如下面
    1. `opkg update`
    2. `opkg install luci-app-dockerman`
 6. 推荐使用 `squashfs` 格式固件，因为 `ext4` 格式的断电关机会有几率开机变成根分区只读，我的 r2s 和其他人都遇到过。
 7. x86_64 目前只有 `squashfs-combined-efi.img` 格式，有其他 `vmdk` 之类格式的需求的话可以帮忙测的话，可以提
-8. 理论上有相关命令的话都可以从别人的固件切换到我的固件上，可以下载我的升级脚本执行：
-   1. `wget https://raw.githubusercontent.com/zhangguanzhang/Actions-OpenWrt/main/build/scripts/update.sh`
-   2. `SKIP_BACK=1 VER=slim FSTYPE=squashfs bash -x /update.sh`
+8. 可在线升级和多源码的都是支持切版本，例如当前是 lede-master 的 r2s 想切到 DHDAXCW 的 stable:
+   1. `SKIP_BACK=1 REPO=DHDAXCW IM_BRANCH=stable bash -x /update.sh`
+   2. 注意这样切换网卡配置会带过去后，可能web网络那里显示有问题，遇到后可以自行删掉网卡配置 `/etc/config/network` 重启，然后接 lan 后访问 web 参照 `/etc/config/network.bak` 配置之前的网络信息重新配置网络
 
 ## ci 涉及
 

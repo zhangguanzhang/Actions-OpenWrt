@@ -9,6 +9,11 @@ if ls -l /local_feed/*.ipk &>/dev/null;then
     sed -ri '/check_signature/s@^[^#]@#&@' /etc/opkg.conf
 fi
 
+# Change default shell to bash
+if [ -f /bin/bash  ];then
+    sed -i 's/\/bin\/ash/\/bin\/bash/g' /etc/passwd
+fi
+
 uci set  aliyundrive-webdav.@server[0].enable=0
 uci commit aliyundrive-webdav
 
@@ -25,6 +30,9 @@ if [ -f /etc/config/qbittorrent ];then
     uci set qbittorrent.main.AnnounceToAllTrackers='true'
     uci commit qbittorrent
 fi
+
+touch /etc/crontabs/root
+chmod 0600 /etc/crontabs/root
 
 # 允许 wan ssh
 uci delete dropbear.@dropbear[0].Interface
