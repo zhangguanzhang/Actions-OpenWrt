@@ -10,6 +10,6 @@
 
 # echo '::set-output name=matrix::[{"name":"immortalwrt","branch":"openwrt-18.06-k5.4","addr":"https://github.com/immortalwrt/immortalwrt"}]'
 
-echo '::set-output name=matrix::[{"name":"lede","branch":"master","addr":"https://github.com/coolsnowwolf/lede"},{"name":"DHDAXCW","branch":"stable","addr":"https://github.com/DHDAXCW/op-rockchip"}]'
+echo '::set-output name=matrix::[{"name":"lede","branch":"master","addr":"https://github.com/coolsnowwolf/lede"},{"name":"immortalwrt","branch":"openwrt-18.06-k5.4","addr":"https://github.com/immortalwrt/immortalwrt"},{"name":"DHDAXCW","branch":"stable","addr":"https://github.com/DHDAXCW/op-rockchip"}]'
 
 #op21.02 target会变成r2s

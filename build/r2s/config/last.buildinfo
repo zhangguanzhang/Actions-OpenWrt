@@ -6,3 +6,6 @@
 # CONFIG_PACKAGE_kmod-rt2x00-lib is not set
 # CONFIG_PACKAGE_kmod-rt2x00-usb is not set
 # CONFIG_PACKAGE_kmod-rt73-usb is not set
+
+# https://github.com/immortalwrt/immortalwrt/discussions/718
+CONFIG_LIBMBEDTLS_HAVE_ARMV8CE_AES=n

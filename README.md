@@ -7,8 +7,8 @@ lede 只有 master 分支，op 目前只有官方的 openwrt-21.02 分支看是�
 |  设备   | 支持的 源码-分支 列表  | 可脚本在线升级 | slim本地源 |  备注 |
 |  ------ | ------------------  | -------  |----  | ----  |
 | x86_64  | [lede](https://github.com/coolsnowwolf/lede)、[op](https://github.com/openwrt/openwrt/tree/openwrt-21.02) | ✔ | ✔ | 开启了很多无线和板载驱动 |
-| r2s  | [lede](https://github.com/coolsnowwolf/lede)、[op](https://github.com/openwrt/openwrt/tree/openwrt-21.02)、[DHDAXCW](https://github.com/DHDAXCW/op-rockchip/tree/stable) | ✔ | ✔ | 骷髅头 DHDAXCW 支持usb wifi 不死机 | 
-| r4s  | [lede](https://github.com/coolsnowwolf/lede)、[DHDAXCW](https://github.com/DHDAXCW/op-rockchip/tree/stable) | ✔ | ✔ | 天灵的还有点问题，op21.02 target会变成r2s |
+| r2s  | [lede](https://github.com/coolsnowwolf/lede)、[op](https://github.com/openwrt/openwrt/tree/openwrt-21.02)、[DHDAXCW](https://github.com/DHDAXCW/op-rockchip/tree/stable)、[immortalwrt](https://github.com/immortalwrt/immortalwrt/tree/openwrt-21.02) | ✔ | ✔ | 骷髅头 DHDAXCW 支持usb wifi 不死机 | 
+| r4s  | [lede](https://github.com/coolsnowwolf/lede)、[DHDAXCW](https://github.com/DHDAXCW/op-rockchip/tree/stable)、[immortalwrt](https://github.com/immortalwrt/immortalwrt/tree/openwrt-18.06-k5.4) | ✔ | ✔ | op 官方的 21.02 target会变成r2s |
 | r1s-h3  | [lede](https://github.com/coolsnowwolf/lede) | ✔ | ✔ | 暂时没添加其他源码，sd卡可以，emcc刷入无法启动，不是我的锅 | 
 | r1s-h5  | [immortalwrt](https://github.com/immortalwrt/immortalwrt/tree/openwrt-18.06-k5.4) | ✔ | ✔ | 暂时没添加其他源码 | 
 | doornet2  | [lede](https://github.com/coolsnowwolf/lede) | ✔ | ✔ | 暂时没添加其他源码 |

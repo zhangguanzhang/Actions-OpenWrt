@@ -15,6 +15,11 @@
 
 # 取消默认的 autosamba 依赖的 luci-app-samba 到 slim 里
 find  ./target/linux/ -maxdepth 2 -type f  -name Makefile -exec sed -i 's#autosamba##' {} \;
+if grep -Eq '^CONFIG_IB=y'  .config;then
+    echo 'CONFIG_PACKAGE_autosamba=m' >> .config
+else
+    echo 'CONFIG_PACKAGE_autosamba=y' >> .config
+fi
 
 kernel_ver=$(grep -Po '^KERNEL_PATCHVER=\K\S+' target/linux/sunxi/Makefile)
 

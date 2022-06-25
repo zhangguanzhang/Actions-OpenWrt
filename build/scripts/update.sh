@@ -351,7 +351,7 @@ function update(){
     # TODO
     # 当前主题写入
     echo 'opkg update' > /mnt/update/img/packages_needed
-    opkg list-installed | grep -E "luci-(i18n|app|proto)-|kmod-fs-" | cut -d ' '  -f1 | \
+    opkg list-installed | grep -E "luci-(i18n|app|proto)-|kmod-fs-|-firmware" | cut -d ' '  -f1 | \
         sort -r | xargs -n1 echo opkg install --force-overwrite >> /mnt/update/img/packages_needed
 
     if [ "$SKIP_BACK" != false ] || [ -n "$NEED_GROW" ] ;then

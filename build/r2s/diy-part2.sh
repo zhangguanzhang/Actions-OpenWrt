@@ -15,6 +15,11 @@
 
 # 取消默认的 autosamba 依赖的 luci-app-samba 到 slim 里
 find  ./target/linux/ -maxdepth 2 -type f  -name Makefile -exec sed -i 's#autosamba##' {} \;
+if grep -Eq '^CONFIG_IB=y'  .config;then
+    echo 'CONFIG_PACKAGE_autosamba=m' >> .config
+else
+    echo 'CONFIG_PACKAGE_autosamba=y' >> .config
+fi
 
 kernel_ver=$(grep -Po '^KERNEL_PATCHVER=\K\S+' target/linux/rockchip/Makefile)
 
@@ -101,13 +106,13 @@ if [ "$repo_name" = 'lede' ] || [ "$repo_name" = 'DHDAXCW' ];then
     find -type d -name luci-app-docker -exec rm -rvf {} \;
 fi
 
-if [ "$repo_name" = 'openwrt' ];then
+if [ "$repo_name" = 'openwrt' ] || [ "$repo_name" = 'immortalwrt' ];then
     # rm -rf package/network/services/dnsmasq
     # svn export https://github.com/coolsnowwolf/lede/trunk/package/network/services/dnsmasq package/network/services/dnsmasq
     # # openwrt 编译会默认打开 dnsmasq，而我的 .config 里会把 dnsmasq-full 打开
     sed -ri 's/dnsmasq\s/dnsmasq-full /' include/target.mk
 
-    # 天灵还没办法编译成功，openwrt 官方的主题必须 luci-theme-argon 这种 21 分支的主题
+    # 天灵 和openwrt 官方的主题必须 luci-theme-argon 这种 21 分支的主题
     sed -ri 's/luci-theme-\S+/luci-theme-argon/g' feeds/luci/collections/luci/Makefile
     sed -i 's/argonne=y/argon=y/' .config
     # 这个不兼容 openwrt 
@@ -125,6 +130,8 @@ sed -i '/^root::/c root:$1$V4UetPzk$CYXluq4wUazHjmCDBCqXF.:0:0:99999:7:::' /etc/
 EOF
     echo 'CONFIG_LUCI_LANG_zh_Hans=y' >> .config
 fi
+
+
 
 # merge_package "-b 18.06 https://github.com/jerrykuku/luci-theme-argon"
 # merge_package "https://github.com/jerrykuku/luci-app-argon-config"
