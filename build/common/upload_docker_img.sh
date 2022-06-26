@@ -54,6 +54,8 @@ function upload(){
 
 firmware_path=$( dirname $( find $GITHUB_WORKSPACE/openwrt/bin/targets -type f -name sha256sums)  )
 
-for file in $(ls ${firmware_path}/*-*-* | grep -Pv 'kernel|rootfs|manifest' | grep -P 'squashfs|ext4' );do
+[ -n "$exclude_str" ] && exclude_str="|${exclude_str#|}"
+# 有些 build_target 没设置 exclude_str
+for file in $(ls ${firmware_path}/*-*-* | grep -Pv "kernel|rootfs|manifest${exclude_str}" | grep -P 'squashfs|ext4' );do
     upload $file
 done

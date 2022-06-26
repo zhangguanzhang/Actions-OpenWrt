@@ -373,6 +373,12 @@ function update(){
         rm back.tar.gz
         success '备份文件已经写入，移除挂载'
     fi
+    # 修复切源码后网卡配置可能不兼容
+    if grep -wq 'network.loopback.device' /mnt/update/img/bin/config_generate;then
+        sed -ri '/option/s#\sifname\s# device #g' /mnt/update/img/etc/config/network
+    else
+        sed -ri '/option/s#\sdevice\s# ifname #g' /mnt/update/img/etc/config/network
+    fi
     # 一直备份网卡配置文件
     # if ! grep -q macaddr /etc/config/network; then
     #     warning '注意：由于已知的问题，“网络接口”配置无法继承，重启后需要重新设置WAN拨号和LAN网段信息'

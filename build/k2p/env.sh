@@ -10,3 +10,4 @@ AutoBuildTimeOut=false
 MakeDownload=true
 ClearPkg=false
 
+EnableCommonBuildInfo=false

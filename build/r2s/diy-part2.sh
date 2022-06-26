@@ -143,6 +143,8 @@ if [ "$build_target" = r2s ];then
     merge_package https://github.com/NateLol/luci-app-oled
     # enable r2s oled plugin by default
     sed -ri "s/enable\s+'0'/enable '1'/" package/custom/luci-app-oled/root/etc/config/oled
+    # https://github.com/NateLol/luci-app-oled/issues/21 解决中文问题
+    [ -d package/custom/luci-app-oled/po/zh_Hans ] && mv package/custom/luci-app-oled/po/zh_Hans package/custom/luci-app-oled/po/zh-cn
 fi
 
 # enable fan control
@@ -155,8 +157,6 @@ fi
 # 'package/feeds/others/luci-app-unblockneteasemusic/Makefile' has a dependency on 'ucode'
 [ ! -d package/utils/ucode ] && svn export https://github.com/coolsnowwolf/lede/trunk/package/utils/ucode  package/utils/ucode
 
-# https://github.com/NateLol/luci-app-oled/issues/21 解决中文问题
-[ -d package/custom/luci-app-oled/po/zh_Hans ] && mv package/custom/luci-app-oled/po/zh_Hans package/custom/luci-app-oled/po/zh-cn
 
 # https://github.com/coolsnowwolf/luci/issues/127
 [ -d package/lean/luci-app-filetransfer ] && sed -i '2a [ ! -f /etc/openwrt_release ] && exit 0' package/lean/luci-app-filetransfer/root/etc/uci-defaults/luci-filetransfer
@@ -207,6 +207,10 @@ chmod a+x ${GITHUB_WORKSPACE}/build/scripts/*.sh
 
 # 修改banner
 echo -e " zgz built on "$(TZ=Asia/Shanghai date '+%Y.%m.%d %H:%M') - ${GITHUB_RUN_NUMBER}"\n -----------------------------------------------------" >> package/base-files/files/etc/banner
+
+default_banner_file=$(find package/ -type f -name openwrt_banner -path '*/default-settings/files/openwrt_banner')
+[ -n "$default_banner_file" ] # 修改banner
+echo -e " zgz built on "$(TZ=Asia/Shanghai date '+%Y.%m.%d %H:%M') - ${GITHUB_RUN_NUMBER}"\n -----------------------------------------------------" >> $default_banner_file
 
 # mksquashfs 工具 segment fault
 # https://github.com/plougher/squashfs-tools/issues/190

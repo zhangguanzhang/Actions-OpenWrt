@@ -11,26 +11,6 @@ if [ -d feeds/others/luci-app-adguardhome ];then
     sed -ri '/^LUCI_DEPENDS:=/s#\+(ca-certs|wget-ssl)##g' luci-app-adguardhome/Makefile
     popd
 fi
-if [ -d feeds/others/adguardhome -a ! -f 'feeds/others/adguardhome/files/AdGuardHome' ];then
-    pushd feeds/others/
-    wget  https://static.adguard.com/adguardhome/release/AdGuardHome_linux_mipsle_softfloat.tar.gz -O - | \
-      tar -zxvf -  --strip-components 2 -C adguardhome/files/ ./AdGuardHome/AdGuardHome 
-    upx -9 adguardhome/files/AdGuardHome
-    # 自带编译出来的 16.2M ，直接下载 upx 压缩会 9M 
-    sed -ri '/GoPackage/d' adguardhome/Makefile
-    SED_NUM=$(awk '$2=="Package/adguardhome/install"{print NR}' adguardhome/Makefile)
-    # 下面的插入内容前面必须是tab，而不是空格
-    sed -i "${SED_NUM}r "<(
-cat  <<'EOF' | sed -r 's#^\s+#\t#'
-  $(INSTALL_DIR) $(1)/usr/bin
-  $(INSTALL_DATA) ./files/AdGuardHome $(1)/usr/bin/AdGuardHome
-  chmod 0755 $(1)/usr/bin/AdGuardHome
-EOF
-  ) adguardhome/Makefile
-  # 必须保留最后的 BuildPackage ，否则编译不出来该包
-  sed -ri '/GoBinPackage,adguardhome/d' adguardhome/Makefile
-  popd
-fi
 
 
 # udp2raw 

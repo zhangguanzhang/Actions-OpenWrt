@@ -90,7 +90,7 @@ jobs:
     outputs:
       imageBuilder: ${{ steps.organize.outputs.imageBuilder }}
       build_target: ${{ steps.organize.outputs.build_target }}
-    name: "编译 ${{matrix.target}}: ${{matrix.repo.name}}-${{matrix.repo.branch}}"
+    name: "${{matrix.target}}: ${{matrix.repo.name}}-${{matrix.repo.branch}}"
     strategy:
       fail-fast: false
       matrix:
@@ -199,7 +199,6 @@ jobs:
 
         # 设置一些 condition 给后续步骤作为判断条件或者执行的值
         bash common/env.sh
-        echo 'build_target=${{ needs.build.outputs.build_target }}' >> $GITHUB_ENV
         # name-branch-target
         echo "cache_name=$( echo ${{ matrix.repo.name }}-${{ matrix.repo.branch }}-${{ matrix.target }} | awk -F/ '{print $NF}' )" >> $GITHUB_ENV
 
@@ -266,7 +265,7 @@ jobs:
         fi
         cd ${BaseDir}
         readlink -f $GITHUB_WORKSPACE/openwrt
-        ls -l . $GITHUB_WORKSPACE/ $GITHUB_WORKSPACE/common $GITHUB_WORKSPACE/config $GITHUB_WORKSPACE/openwrt/
+        ls -la . $GITHUB_WORKSPACE/ $GITHUB_WORKSPACE/common $GITHUB_WORKSPACE/config $GITHUB_WORKSPACE/openwrt/
 
         echo "repo_name=${{ matrix.repo.name }}" >> $GITHUB_ENV
 
@@ -335,7 +334,7 @@ jobs:
         # feeds 后做些修改
         chmod +x $DIY_P2_SH
         pushd openwrt
-        echo "running $GITHUB_WORKSPACE/$DIY_P2_SH at ${PWD}, repo_name: ${repo_name}"
+        echo "running $GITHUB_WORKSPACE/$DIY_P2_SH at ${PWD}, repo_name: ${repo_name}, build_target: ${build_target}"
         $GITHUB_WORKSPACE/$DIY_P2_SH
         popd
 
@@ -383,9 +382,13 @@ jobs:
         [ -f config/last.buildinfo ] && cat config/last.buildinfo >> common/disable.buildinfo
 
         [ "$EnableDocker" != 'true' ] && rm -f openwrt/docker.buildinfo
-        cat openwrt/*.buildinfo >> openwrt/.config
+        if [ "${EnableCommonBuildInfo:=true}" = true ];then
+          cat openwrt/*.buildinfo >> openwrt/.config
+        else
+          sed -i '1r openwrt/small.buildinfo' openwrt/.config
+        fi
         # 最后写入 last，理论上能覆盖掉前面的一些开启
-        # 2022/06/17 测试，前面=y 后面 is noet set 还是开启的
+        # 2022/06/17 测试，前面=y 后面 is not set 还是开启的
         # TODO 
         # 后续要处理下这块
         cat common/disable.buildinfo >> openwrt/.config
@@ -426,8 +429,19 @@ jobs:
         cd openwrt
         if [ "$MakeDownload" == true ];then
           # 防止缓存了老版本的包
-          rm -rf dl/go-mod-cache
+          rm -rf dl/go-mod-cache # 不清理会导致很多 go 的包编译失败
+          if [ -f dl/time ];then
+            last_time=$(cat dl/time)
+            # echo 3*24*60*60 | bc # 超过上一次三天就清理一次 
+            if [ $(( `date +%s` - $last_time  )) -ge 259200 ];then
+              rm -rf dl tmp
+            fi
+          else
+            mkdir -p dl
+            date +%s > dl/time
+          fi
           make download -j8
+          # 此处 -type f 限制的话会影响 golang 的包编译貌似
           find dl -size -1024c -exec ls -l {} \;
           find dl -size -1024c -exec rm -f {} \;
         fi
@@ -556,7 +570,7 @@ jobs:
           if ls *-imagebuilder-* &>/dev/null;then
             # # 避免以后其他的 repo 构建的默认就带 imagebuilder，例如 sft1200。上传 imageBuilder 但是不给后续的 slim/full 执行
             echo "::set-output name=uploadImageBuilder::true"
-            if [ "$USED_CONFIG_IB" == true ];then
+            if [ "${CACHE}" = true ] && [ "$USED_CONFIG_IB" == true ];then
                 echo "::set-output name=imageBuilder::openwrt-imagebuilder-${{ env.DEVICE_NAME }}-${{ matrix.repo.name }}-${{ matrix.repo.branch }}"
             fi
           else
@@ -569,6 +583,7 @@ jobs:
       if: steps.organize.outputs.status == 'success' && !cancelled()
       run: |
         cd openwrt
+        # 没 imageBuilder下也就是不做slim的设备此刻执行 after
         if [ -f "$GITHUB_WORKSPACE/$DIY_AFTER" ] && [ "$no_imageBuilder" = true ] ;then
           bash $GITHUB_WORKSPACE/$DIY_AFTER
         fi
@@ -666,10 +681,27 @@ jobs:
 
         if [ "${UseCache}" == true -a -n "${{ secrets.gh_token }}" ];then
           set -x
-          # TODO
-          # 可以在目录里在文件 env 里写入时间，然后在 compile 之前，如果文件时间比当前时间差距大于2天，则删除 dl/go-mod-cache
+          # tmp 貌似是必须删除的
           rm -rf openwrt/{bin,tmp,files}
-          #sudo umount openwrt/{build_dir,staging_dir,tmp} cache
+
+          # build_dir 是容量最大的，如果不清理虽然每次第二次构建只需要20-40m左右
+          # 但是这个目录会越来越大，直到后续的切割上传 action 容量满了
+          # 暂时个人没啥好办法，我自己测了下删除的话就是 2-3 小时编译了
+          # if [ -f openwrt/build_dir/time ];then
+          #   last_time=$(cat openwrt/build_dir/time)
+          #   # echo 4*24*60*60 | bc # 超过上一次四天就清理一次 
+          #   if [ $(( `date +%s` - $last_time  )) -ge 345600 ];then
+          #   # 有 imageBuilder 才说明前面构建完，此刻才清理 build_dir
+          #     [ -z "$no_imageBuilder" ] && rm -rf openwrt/build_dir/
+          #   fi
+          # else
+          #   date +%s > openwrt/build_dir/time
+          # fi
+
+          if [ -z "$no_imageBuilder" ] && [ `grep -E "${cache_name}.img.zst" /tmp/cache_list| wc -l` -ge 10 ];then
+            rm -rf openwrt/build_dir
+          fi
+
           # https://unix.stackexchange.com/questions/18048/list-only-bind-mounts
           # for path in `sudo findmnt --kernel -n --list | grep '\[' | awk -vWorkDir="$GITHUB_WORKSPACE"  '($2 ~ WorkDir"/cache/" && $1 ~ WorkDir"/openwrt/"){print $1}'`;do
           #   sudo umount $path
@@ -695,12 +727,12 @@ jobs:
           sync
           cache_file_count=`grep -E "${cache_name}.img.zst" /tmp/cache_list| wc -l`
           Avail_G_NUM=$(df -BG | awk '$6=="/"{print +$4}')
+          # 可能存在当前上传的切割文件数量少于 cache release 上的，需要提前删除
+          gh release -R ${GITHUB_REPOSITORY} view cache  2>/dev/null | grep -Po "asset:\s+\K${cache_name}.img.zst.\d+" | \
+              xargs -r -n1 gh release -R ${GITHUB_REPOSITORY} delete-asset cache  -y
           if [ "$Avail_G_NUM" -gt 20 -a "$cache_file_count" -lt 10 ] && zstdmt -c --long ${cache_name}.img | split --numeric=1 -b 2000m - ${cache_name}.img.zst.;then
             ls -l
             rm -f ${cache_name}.img # 减少容量
-            # 可能存在当前上传的切割文件数量少于 cache release 上的，需要提前删除
-            gh release -R ${GITHUB_REPOSITORY} view cache  2>/dev/null | grep -Po "asset:\s+\K${cache_name}.img.zst.\d+" | \
-                xargs -r -n1 gh release -R ${GITHUB_REPOSITORY} delete-asset cache  -y
             gh release -R ${GITHUB_REPOSITORY} upload cache ${cache_name}.img.zst.* --clobber
             rm -f ${cache_name}.img.zst.*
           else
@@ -782,7 +814,7 @@ jobs:
         echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" | \
           sudo tee /etc/apt/sources.list.d/github-cli.list > /dev/null
         sudo -E apt-get -qq update
-        sudo -E apt-get -qq install git gh gawk unzip patch autoconf automake upx wget curl rsync jq rename 
+        sudo -E apt-get -qq install qemu-utils git gh gawk unzip patch autoconf automake upx wget curl rsync jq rename 
         sudo -E apt-get -qq autoremove --purge
         sudo -E apt-get -qq clean
         sudo timedatectl set-timezone "$TZ"
@@ -854,12 +886,18 @@ jobs:
           echo "suffix=-full" >> $GITHUB_ENV
         fi
 
+        # 必要包拆分到 small 和 common，这里合并下
+        (
+          cd ${GITHUB_WORKSPACE}/common/
+          cat small.buildinfo >> common.buildinfo
+        )
+
         sed -i 's/luci-app-[^ ]*//g' include/target.mk $(find target/ -name Makefile)
         ls packages/*.ipk | xargs -n1 basename > package.list
         #PACKAGES=$(grep -v CONFIG_PACKAGE_luci-app ${GITHUB_WORKSPACE}/common/common.buildinfo | grep -Po '^CONFIG_PACKAGE_\K[^A-Z=]+(?==y)' | xargs -n1 -i grep -o {} package.list | sort -u | xargs echo )
         #extra_pkgs="luci-i18n-base-zh-cn luci-i18n-firewall-zh-cn luci-app-ttyd bash default-settings luci-app-docker -luci-app-ssr-plus -luci-app-samba"
 
-        extra_pkgs=" -luci-app-ssr-plus -luci-app-samba"
+        extra_pkgs="luci-i18n-base-zh-cn -luci-app-ssr-plus -luci-app-samba"
         if [ "${{matrix.target}}" == 'slim' ];then
           extra_pkgs+=' -luci-app-docker '
           PACKAGES=$( grep -Po '^CONFIG_PACKAGE_\K[^A-Z=]+' ${GITHUB_WORKSPACE}/common/common.buildinfo | tr '\n' ' ' )
@@ -898,6 +936,7 @@ jobs:
       if: steps.organize.outputs.status == 'success' && !cancelled()
       run: |
         cd openwrt/
+        set -x
         if [ -f "$GITHUB_WORKSPACE/$DIY_AFTER" ];then
           bash $GITHUB_WORKSPACE/$DIY_AFTER ${{ matrix.repo.name }}-${{ matrix.repo.branch }} ${{ env.suffix }} 
         fi

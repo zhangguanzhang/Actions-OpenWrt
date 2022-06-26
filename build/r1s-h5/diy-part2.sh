@@ -106,7 +106,7 @@ if [ "$repo_name" = 'openwrt' ];then
     # # openwrt 编译会默认打开 dnsmasq，而我的 .config 里会把 dnsmasq-full 打开
     sed -ri 's/dnsmasq\s/dnsmasq-full /' include/target.mk
 
-    # 天灵还没办法编译成功，openwrt 官方的主题必须 luci-theme-argon 这种 21 分支的主题
+    # 天灵，openwrt 官方的主题必须 luci-theme-argon 这种 21 分支的主题
     sed -ri 's/luci-theme-\S+/luci-theme-argon/g' feeds/luci/collections/luci/Makefile
     sed -i 's/argonne=y/argon=y/' .config
     # 这个不兼容 openwrt 
@@ -199,6 +199,9 @@ chmod a+x ${GITHUB_WORKSPACE}/build/scripts/*.sh
 
 # 修改banner
 echo -e " zgz built on "$(TZ=Asia/Shanghai date '+%Y.%m.%d %H:%M') - ${GITHUB_RUN_NUMBER}"\n -----------------------------------------------------" >> package/base-files/files/etc/banner
+[ -n "$default_banner_file" ] # 修改banner
+echo -e " zgz built on "$(TZ=Asia/Shanghai date '+%Y.%m.%d %H:%M') - ${GITHUB_RUN_NUMBER}"\n -----------------------------------------------------" >> $default_banner_file
+
 
 # mksquashfs 工具 segment fault
 # https://github.com/plougher/squashfs-tools/issues/190
