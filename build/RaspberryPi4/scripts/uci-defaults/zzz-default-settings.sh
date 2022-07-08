@@ -9,12 +9,13 @@ if [ -f /bin/zsh ];then
   sed -i '/^root:/s#/bin/ash#/bin/zsh#' /etc/passwd
 fi
 
-# ipk
-opkg install /*_*_*.ipk
-rm -f /*_*_*.ipk
+if ls -l /*_*_*.ipk 1>/dev/null;then
+    opkg install /*_*_*.ipk
+    rm -f /*_*_*.ipk
+fi
 
 # slim 固件本地 opkg 配置
-if ls -l /local_feed/*.ipk &>/dev/null;then
+if ls -l /local_feed/*.ipk 1>/dev/null;then
     sed -ri 's@^[^#]@#&@' /etc/opkg/distfeeds.conf
     grep -E '/local_feed' /etc/opkg/customfeeds.conf || echo 'src/gz local file:///local_feed' >> /etc/opkg/customfeeds.conf
     # 取消签名，暂时解决不了
@@ -22,9 +23,8 @@ if ls -l /local_feed/*.ipk &>/dev/null;then
 fi
 
 
-
 if [ -f /etc/uci-defaults/luci-aliyundrive-webdav ];then
-    uci set aliyundrive-webdav.@server[0].enable=0
+    uci set  aliyundrive-webdav.@server[0].enable=0
     uci commit aliyundrive-webdav
 fi
 
@@ -48,7 +48,7 @@ if [ -f /etc/config/qbittorrent ];then
     uci commit qbittorrent
 fi
 
-# dns有问题的时候 ip ntp 保障
+
 uci add_list system.ntp.server=120.25.115.20
 uci commit system
 

@@ -54,8 +54,6 @@ for sh_file in `ls ${GITHUB_WORKSPACE}/scripts/files/*.sh`;do
     source $sh_file
 done
 
-# 修改banner
-echo -e " built on "$(TZ=Asia/Shanghai date '+%Y.%m.%d %H:%M') - ${GITHUB_RUN_NUMBER}"\n -----------------------------------------------------" >> package/base-files/files/etc/banner
 
 # /tmp/resolv.conf.d/resolv.conf.auto
 #echo nameserver 223.5.5.5 >> files/tmp/resolv.conf.d/resolv.conf.auto

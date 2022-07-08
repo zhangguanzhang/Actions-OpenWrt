@@ -13,13 +13,6 @@
 # Modify default IP
 #sed -i 's/192.168.1.1/192.168.50.5/g' package/base-files/files/bin/config_generate
 
-# 取消默认的 autosamba 依赖的 luci-app-samba 到 slim 里
-find  ./target/linux/ -maxdepth 2 -type f  -name Makefile -exec sed -i 's#autosamba##' {} \;
-if grep -Eq '^CONFIG_IB=y'  .config;then
-    echo 'CONFIG_PACKAGE_autosamba=m' >> .config
-else
-    echo 'CONFIG_PACKAGE_autosamba=y' >> .config
-fi
 
 kernel_ver=$(grep -Po '^KERNEL_PATCHVER=\K\S+' target/linux/rockchip/Makefile)
 
@@ -46,8 +39,6 @@ function merge_package(){
 
 rm -rf package/custom; mkdir package/custom
 
-# 'package/feeds/others/luci-app-unblockneteasemusic/Makefile' has a dependency on 'ucode'
-[ ! -d package/utils/ucode ] && svn export https://github.com/coolsnowwolf/lede/trunk/package/utils/ucode  package/utils/ucode
 
 if [ "$repo_name" = 'lede' ];then
     # https://github.com/coolsnowwolf/lede/issues/9483
@@ -64,28 +55,56 @@ if [ "$repo_name" = 'lede' ];then
     sed -i 's/PKG_SOURCE_VERSION:=.*/PKG_SOURCE_VERSION:=master/' package/kernel/rtl8821cu/Makefile
     sed -i 's/PKG_MIRROR_HASH:=.*/PKG_MIRROR_HASH:=skip/' package/kernel/rtl8821cu/Makefile
 
-    # # https://github.com/coolsnowwolf/packages/issues/352
-    # rm -f feeds/packages/utils/dockerd/files{/etc/config/dockerd,/etc/docker/daemon.json,/etc/init.d/dockerd}
-    # SED_NUM=$( grep -n '^\s*/etc/config/dockerd' feeds/packages/utils/dockerd/Makefile | awk -F: '$0~":"{print $1}')
-    # if [ -n "$SED_NUM" ];then
-    #     sed -ri "$[SED_NUM-1],$[SED_NUM+1]d" feeds/packages/utils/dockerd/Makefile
-    # fi
-    # sed -ri '\%/files/(daemon.json|dockerd.init|etc/config/dockerd)%d' feeds/packages/utils/dockerd/Makefile
-    # sed -ri '\%\$\(INSTALL_DIR\) \$\(1\)/etc/(docker|init\.d|config)%d' feeds/packages/utils/dockerd/Makefile
-    # # https://github.com/coolsnowwolf/packages/issues/466
-    # cat ./feeds/luci/applications/luci-app-docker/root/etc/docker-init > ./feeds/luci/applications/luci-app-docker/root/etc/init.d/dockerd 
-
-    find -type d -name luci-app-docker -exec rm -rvf {} \;
+    # https://github.com/coolsnowwolf/lede/issues/9822
+    if [ "$kernel_ver" = '5.18' ] && grep -Pq '^CONFIG_PACKAGE_kmod-gpu-lima=y' .config;then
+        sed -ri '/^KERNEL_PATCHVER=/s#=5.[0-9]+$#=5.15#' target/linux/rockchip/Makefile
+    fi
 fi
 
-# openwrt 的目录里没这目录
-# https://github.com/coolsnowwolf/lede/issues/3462
-[ ! -d tools/upx ] && svn export https://github.com/coolsnowwolf/lede/trunk/tools/upx   tools/upx
-[ ! -d tools/ucl ] && svn export https://github.com/coolsnowwolf/lede/trunk/tools/ucl   tools/ucl
-if ! grep -q upx tools/Makefile;then
-    SED_NUM=$(awk '$1=="tools-y"{a=NR}$1~/tools-\$/{print a;exit}' tools/Makefile)
-    sed -ri "${SED_NUM}a tools-y += ucl upx" tools/Makefile
-    sed -ri '/dependencies/a $(curdir)/upx/compile := $(curdir)/ucl/compile' tools/Makefile
+# https://github.com/coolsnowwolf/lede/pull/9059
+# https://github.com/immortalwrt/immortalwrt/issues/735
+# 只有lede 和骷髅头修复了这个问题，这里脚本用 lede 的
+if [ "$repo_name" != 'lede' ] && [ "$repo_name" != 'DHDAXCW' ];then
+    curl -s https://raw.githubusercontent.com/coolsnowwolf/lede/master/target/linux/rockchip/armv8/base-files/etc/board.d/02_network > target/linux/rockchip/armv8/base-files/etc/board.d/02_network
+    mac_patch_file=$(grep -P '^\+\s+.+?\<&mac_address\>' target/linux/rockchip/patches-${kernel_ver}/* | cut -d ':' -f 1)
+    if [ -n "$mac_patch_file" ];then
+        sed_num=$( grep -Pn '^\+\s+.+?\<&mac_address\>' $mac_patch_file | awk -F':' '{print $1-1}' )
+        sed -ri "$sed_num,$[sed_num+3]s#^\+([^/])#+//\1#" $mac_patch_file
+    fi
+    # https://github.com/immortalwrt/immortalwrt/discussions/736
+    if [ "$repo_branch" = 'openwrt-18.06-k5.4' ];then
+        # svn export https://github.com/coolsnowwolf/packages/trunk/net/qBittorrent        ./feeds/packages/net/qBittorrent
+        # svn export https://github.com/coolsnowwolf/packages/trunk/net/qBittorrent-static ./feeds/packages/net/qBittorrent-static
+        # merge_package https://github.com/coolsnowwolf/packages/trunk/net/qBittorrent
+        # merge_package https://github.com/coolsnowwolf/packages/trunk/net/qBittorrent-static
+        # sed -ri '/^LUCI_DEPENDS/s#qBittorrent-Enhanced-Edition#qBittorrent#' ./feeds/luci/applications/luci-app-qbittorrent/Makefile
+        if [ -z "$(awk '/^CMAKE_HOST_OPTIONS/{flag=1}flag==1{if($0~"DFEATURE_glib=OFF"){print 1}}flag==1&&(flag==1)&&/^\s*$/{exit;}' ./feeds/packages/libs/qt6base/Makefile)" ];then
+            sed -ri '/^CMAKE_HOST_OPTIONS/r '<(echo -e '\t-DFEATURE_glib=OFF \\') ./feeds/packages/libs/qt6base/Makefile
+        fi
+
+        # 天灵的 18.06 分支源码下，rootfs 得修改下
+        rootfs_size=$( awk -F= '/^CONFIG_TARGET_ROOTFS_PARTSIZE/{print $2+20}' .config )
+        if [ -n "$rootfs_size" ];then
+            sed -ri '/^CONFIG_TARGET_ROOTFS_PARTSIZE=/s#=[0-9]+$#='"${rootfs_size}"'#' .config
+        fi
+    fi
+    # 修复 openwrt r4s target 编译完成变成 r2s 的文件名
+    if ! grep -Eq nanopi-r4s target/linux/rockchip/image/armv8.mk ;then
+cat >> target/linux/rockchip/image/armv8.mk <<'EOF'
+
+define Device/friendlyarm_nanopi-r4s
+  DEVICE_VENDOR := FriendlyARM
+  DEVICE_MODEL := NanoPi R4S
+  DEVICE_VARIANT := 4GB LPDDR4
+  SOC := rk3399
+  UBOOT_DEVICE_NAME := nanopi-r4s-rk3399
+  IMAGE/sysupgrade.img.gz := boot-common | boot-script nanopi-r4s | pine64-img | gzip | append-metadata
+  DEVICE_PACKAGES := kmod-r8169
+endef
+TARGET_DEVICES += friendlyarm_nanopi-r4s
+
+EOF
+    fi
 fi
 
 
@@ -95,37 +114,7 @@ fi
 #     sed -i '2a [ ! -f /etc/openwrt_release ] && exit 0' feeds/others/luci-app-openclash/root/etc/init.d/openclash
 # fi
 
-# Modify default theme
-# https://github.com/jerrykuku/luci-theme-argon/tree/18.06
-# https://github.com/kenzok8/openwrt-packages
-if [ "$repo_name" = 'lede' ];then
-    sed -ri 's/luci-theme-\S+/luci-theme-argonne/g' feeds/luci/collections/luci/Makefile  # feeds/luci/modules/luci-base/root/etc/config/luci
-fi
 
-if [ "$repo_name" = 'openwrt' ];then
-    # rm -rf package/network/services/dnsmasq
-    # svn export https://github.com/coolsnowwolf/lede/trunk/package/network/services/dnsmasq package/network/services/dnsmasq
-    # # openwrt 编译会默认打开 dnsmasq，而我的 .config 里会把 dnsmasq-full 打开
-    sed -ri 's/dnsmasq\s/dnsmasq-full /' include/target.mk
-
-    # 天灵还没办法编译成功，openwrt 官方的主题必须 luci-theme-argon 这种 21 分支的主题
-    sed -ri 's/luci-theme-\S+/luci-theme-argon/g' feeds/luci/collections/luci/Makefile
-    sed -i 's/argonne=y/argon=y/' .config
-    # 这个不兼容 openwrt 
-    find -type d -name 'luci-*-argonne*' -exec rm -rf {} \;
-
-    sed -i 's/\+IPV6:luci-proto-ipv6//' feeds/luci/collections/luci/Makefile
-
-    svn export https://github.com/immortalwrt/immortalwrt/trunk/package/emortal/autocore   package/emortal/autocore
-    svn export https://github.com/immortalwrt/immortalwrt/trunk/package/emortal/ipv6-helper   package/emortal/ipv6-helper
-
-    cat > package/base-files/files/etc/uci-defaults/zzz-default-settings <<'EOF'
-# 默认密码 password
-# sed -i 's/root::0:0:99999:7:::/root:$1$V4UetPzk$CYXluq4wUazHjmCDBCqXF.:0:0:99999:7:::/g' /etc/shadow
-sed -i '/^root::/c root:$1$V4UetPzk$CYXluq4wUazHjmCDBCqXF.:0:0:99999:7:::' /etc/shadow
-EOF
-    echo 'CONFIG_LUCI_LANG_zh_Hans=y' >> .config
-fi
 
 # merge_package "-b 18.06 https://github.com/jerrykuku/luci-theme-argon"
 # merge_package "https://github.com/jerrykuku/luci-app-argon-config"
@@ -145,22 +134,6 @@ fi
 # https://github.com/NateLol/luci-app-oled/issues/21 解决中文问题
 [ -d package/custom/luci-app-oled/po/zh_Hans ] && mv package/custom/luci-app-oled/po/zh_Hans package/custom/luci-app-oled/po/zh-cn
 
-# https://github.com/coolsnowwolf/luci/issues/127
-[ -d package/lean/luci-app-filetransfer ] && sed -i '2a [ ! -f /etc/openwrt_release ] && exit 0' package/lean/luci-app-filetransfer/root/etc/uci-defaults/luci-filetransfer
-[ -f feeds/luci/applications/luci-app-unblockmusic/root/etc/init.d/unblockmusic ] && \
-    sed -i '1a [ ! -f /etc/openwrt_release ] && exit 0' feeds/luci/applications/luci-app-unblockmusic/root/etc/init.d/unblockmusic
-[ -f ./feeds/others/luci-app-argonne-config/root/etc/uci-defaults/luci-argonne-config ] && \
-    sed -i '1a [ ! -f /etc/openwrt_release ] && exit 0' ./feeds/others/luci-app-argonne-config/root/etc/uci-defaults/luci-argonne-config
-[ -f ./feeds/others/luci-theme-argonne/root/etc/uci-defaults/90_luci-theme-argonne ] && \
-    sed -i '1a [ ! -f /etc/openwrt_release ] && exit 0'  ./feeds/others/luci-theme-argonne/root/etc/uci-defaults/90_luci-theme-argonne
-
-#[ -f ./feeds/others/luci-theme-argonne/Makefile ] && sed -i '/LUCI_DEPENDS/s#=#&+libc#' ./feeds/others/luci-theme-argonne/Makefile
-if [ -f ./feeds/others/luci-theme-argonne/Makefile ];then
-    SED_NUM=$( grep -Pn '^\s*define\s+Package/\S+/postinst' ./feeds/others/luci-theme-argonne/Makefile |  awk -F: '$0~":"{print $1}')
-    if [ -n "SED_NUM" ];then
-        sed -i "$[SED_NUM+2]i [ ! -f /etc/openwrt_release ] && exit 0" ./feeds/others/luci-theme-argonne/Makefile
-    fi
-fi
 
 
 # unblockneteasemusic 的 状态判断是 exec 调用 ps 命令，它没适配 proc-ng-ps 命令会影响 
@@ -175,8 +148,7 @@ mkdir -p files/etc/uci-defaults/
 cp ${GITHUB_WORKSPACE}/scripts/uci-defaults/* files/etc/uci-defaults/
 chmod a+x files/etc/uci-defaults/*
 
-mkdir -p files/root/
-echo 'set paste' >> files/root/.vimrc
+
 
 # 预处理下载相关文件，保证打包固件不用单独下载
 # source ${GITHUB_WORKSPACE}/scripts/files/adh.sh
@@ -192,18 +164,6 @@ chmod a+x ${GITHUB_WORKSPACE}/build/scripts/*.sh
 # 放入升级脚本
 \cp -a ${GITHUB_WORKSPACE}/build/scripts/update.sh files/
 
-# 修改banner
-echo -e " zgz built on "$(TZ=Asia/Shanghai date '+%Y.%m.%d %H:%M') - ${GITHUB_RUN_NUMBER}"\n -----------------------------------------------------" >> package/base-files/files/etc/banner
 
-# mksquashfs 工具 segment fault
-# https://github.com/plougher/squashfs-tools/issues/190
-if [ -d feeds/packages/utils/squashfs-tools ];then
-    curl -sL https://raw.githubusercontent.com/coolsnowwolf/packages/caad6dedd4a029d10c6e75281e6e6e31d8d74eaf/utils/squashfs-tools/Makefile > feeds/packages/utils/squashfs-tools/Makefile
-fi
-
-# 修复 imageBuilder 打包 ntpdate 的 uci 错误
-if [ -f feeds/packages/net/ntpd/files/ntpdate.init ];then
-    sed -i '2a [ ! -f /etc/openwrt_release ] && exit 0' feeds/packages/net/ntpd/files/ntpdate.init
-fi
 
 # ---------- end -----------

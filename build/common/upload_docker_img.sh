@@ -8,7 +8,7 @@ fi
 
 function upload_dockerhub(){
 
-    local hub_img=zhangguanzhang/${DEVICE_NAME} BUILD_DIR=$(mktemp -d)
+    local hub_img=zhangguanzhang/${DEVICE_NAME,,} BUILD_DIR=$(mktemp -d)
     local BRANCH=${GITHUB_REF##*/}
     local file=$(basename $1)
     local tag=release-$(date +%Y-%m-%d)
@@ -33,10 +33,11 @@ EOF
 
     (
         cd ${BUILD_DIR}
-        echo docker buildx build --platform linux/amd64  -t ${build_img} --push .
-        docker buildx build --platform linux/amd64  -t ${build_img} --push .
+        echo docker build  -t ${build_img} .
         # 同步到阿里云
-        docker buildx build --platform linux/amd64  -t registry.aliyuncs.com/${build_img} --push .
+        docker build  -t registry.aliyuncs.com/${build_img} . && docker push registry.aliyuncs.com/${build_img}
+        docker tag registry.aliyuncs.com/${build_img} ${build_img} && docker push ${build_img} 
+        docker rmi ${build_img}
     )
     # docker push ${build_img}
     # if [ "${BRANCH}" != main ];then

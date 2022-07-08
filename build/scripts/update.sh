@@ -175,6 +175,8 @@ function x86_64(){
 }
 
 function update(){
+    # tag 必须小写
+    board_id=${board_id,,}
     debug df -h
     mount -t tmpfs -o remount,size=100% tmpfs /tmp
     bs=`expr $(cat /sys/block/$block_device/size) \* 512`
@@ -351,7 +353,7 @@ function update(){
     # TODO
     # 当前主题写入
     echo 'opkg update' > /mnt/update/img/packages_needed
-    opkg list-installed | grep -E "luci-(i18n|app|proto)-|kmod-fs-|-firmware" | cut -d ' '  -f1 | \
+    opkg list-installed | grep -E 'luci-(i18n|app|proto)-|^kmod-fs-|-firmware|^ipv6helper\s' | cut -d ' '  -f1 | \
         sort -r | xargs -n1 echo opkg install --force-overwrite >> /mnt/update/img/packages_needed
 
     if [ "$SKIP_BACK" != false ] || [ -n "$NEED_GROW" ] ;then
@@ -511,7 +513,7 @@ function opkgUpdate(){
         # 可联网下并且 /etc/opkg 的 mtime 大于 20 分钟则 opkg update
         if [ "$http_code" != 000 ] && [ "$http_code" != 000000 ];then
             if [[ $(( $(date +%s) - $(date +%s -r /etc/opkg ) )) -ge 1200 ]];then
-                opkg update || true
+                timeout 40 opkg update || true
                 touch -m /etc/opkg
             fi
         else
@@ -579,7 +581,11 @@ function main(){
         board_id="$MATRIX_TARGET"
     fi
 
-    type -t $board_id 1>/dev/bull || err "暂不支持该设备: ${board_id}"
+    tmp_mountpoint_end_size=2600MB
+    first_grow_condition_size=1800
+    blob_layer_reg_str=$board_id
+
+    #type -t $board_id 1>/dev/bull || err "暂不支持该设备: ${board_id}"
 
     if [ -z "$REPO" ];then
         if [ -z "$MATRIX_REPO_NAME" ];then
@@ -625,7 +631,8 @@ function main(){
     # 自带的 dd 不行
     [ ! -f /usr/libexec/dd-coreutils ] && opkg install coreutils-dd
 
-    $board_id
+    #$board_id
+    update
 }
 
 main

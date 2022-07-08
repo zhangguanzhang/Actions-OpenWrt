@@ -13,13 +13,7 @@
 # Modify default IP
 #sed -i 's/192.168.1.1/192.168.50.5/g' package/base-files/files/bin/config_generate
 
-# 取消默认的 autosamba 依赖的 luci-app-samba 到 slim 里
-find  ./target/linux/ -maxdepth 2 -type f  -name Makefile -exec sed -i 's#autosamba##' {} \;
-if grep -Eq '^CONFIG_IB=y'  .config;then
-    echo 'CONFIG_PACKAGE_autosamba=m' >> .config
-else
-    echo 'CONFIG_PACKAGE_autosamba=y' >> .config
-fi
+[ -f "$GITHUB_ENV" ] && source $GITHUB_ENV
 
 kernel_ver=$(grep -Po '^KERNEL_PATCHVER=\K\S+' target/linux/rockchip/Makefile)
 
@@ -65,70 +59,20 @@ if [ "$repo_name" = 'lede' ];then
         done
     fi
 
-    # use latest driver of rtl8821CU
-    sed -i 's/PKG_SOURCE_VERSION:=.*/PKG_SOURCE_VERSION:=master/' package/kernel/rtl8821cu/Makefile
-    sed -i 's/PKG_MIRROR_HASH:=.*/PKG_MIRROR_HASH:=skip/' package/kernel/rtl8821cu/Makefile
+    # https://github.com/coolsnowwolf/lede/issues/9803
+    # lede 暂时删掉 ath6kl ，原因是 https://github.com/coolsnowwolf/lede/commit/66d19a4e3673b30594b5de3b8d226160a0032af5 升级了 mac80211导致
 
-fi
-
-# openwrt 的目录里没这目录
-# https://github.com/coolsnowwolf/lede/issues/3462
-[ ! -d tools/upx ] && svn export https://github.com/coolsnowwolf/lede/trunk/tools/upx   tools/upx
-[ ! -d tools/ucl ] && svn export https://github.com/coolsnowwolf/lede/trunk/tools/ucl   tools/ucl
-if ! grep -q upx tools/Makefile;then
-    SED_NUM=$(awk '$1=="tools-y"{a=NR}$1~/tools-\$/{print a;exit}' tools/Makefile)
-    sed -ri "${SED_NUM}a tools-y += ucl upx" tools/Makefile
-    sed -ri '/dependencies/a $(curdir)/upx/compile := $(curdir)/ucl/compile' tools/Makefile
-fi
-
-
-# https://github.com/vernesong/OpenClash/issues/1930
-# if [ -d feeds/others/luci-app-openclash ];then
-#     sed -i '2a [ ! -f /etc/openwrt_release ] && exit 0' feeds/others/luci-app-openclash/root/etc/init.d/openclash
-# fi
-
-# Modify default theme
-# https://github.com/jerrykuku/luci-theme-argon/tree/18.06
-# https://github.com/kenzok8/openwrt-packages
-if [ "$repo_name" = 'lede' ] || [ "$repo_name" = 'DHDAXCW' ];then
-    sed -ri 's/luci-theme-\S+/luci-theme-argonne/g' feeds/luci/collections/luci/Makefile  # feeds/luci/modules/luci-base/root/etc/config/luci
-    # # https://github.com/coolsnowwolf/packages/issues/352
-    # rm -f feeds/packages/utils/dockerd/files{/etc/config/dockerd,/etc/docker/daemon.json,/etc/init.d/dockerd}
-    # SED_NUM=$( grep -n '^\s*/etc/config/dockerd' feeds/packages/utils/dockerd/Makefile | awk -F: '$0~":"{print $1}')
-    # if [ -n "$SED_NUM" ];then
-    #     sed -ri "$[SED_NUM-1],$[SED_NUM+1]d" feeds/packages/utils/dockerd/Makefile
+    sed -ri '/^KERNEL_PATCHVER=/s#'"${kernel_ver}"'#5.4#' target/linux/rockchip/Makefile
+    # if grep -Pq '^PKG_VERSION:=5.15.33-1' package/kernel/mac80211/Makefile;then
+    #     git revert 66d19a4e3673b30594b5de3b8d226160a0032af5
+    #     curl https://raw.githubusercontent.com/coolsnowwolf/lede/08a65772566438d2a6ab03f97e3b21e7569b2fcc/package/kernel/mac80211/files/lib/netifd/wireless/mac80211.sh > package/kernel/mac80211/files/lib/netifd/wireless/mac80211.sh 
     # fi
-    # sed -ri '\%/files/(daemon.json|dockerd.init|etc/config/dockerd)%d' feeds/packages/utils/dockerd/Makefile
-    # sed -ri '\%\$\(INSTALL_DIR\) \$\(1\)/etc/(docker|init\.d|config)%d' feeds/packages/utils/dockerd/Makefile
-    # # https://github.com/coolsnowwolf/packages/issues/466
-    # cat ./feeds/luci/applications/luci-app-docker/root/etc/docker-init > ./feeds/luci/applications/luci-app-docker/root/etc/init.d/dockerd 
 
-    find -type d -name luci-app-docker -exec rm -rvf {} \;
-fi
 
-if [ "$repo_name" = 'openwrt' ] || [ "$repo_name" = 'immortalwrt' ];then
-    # rm -rf package/network/services/dnsmasq
-    # svn export https://github.com/coolsnowwolf/lede/trunk/package/network/services/dnsmasq package/network/services/dnsmasq
-    # # openwrt 编译会默认打开 dnsmasq，而我的 .config 里会把 dnsmasq-full 打开
-    sed -ri 's/dnsmasq\s/dnsmasq-full /' include/target.mk
+    # use latest driver of rtl8821CU
+    # sed -i 's/PKG_SOURCE_VERSION:=.*/PKG_SOURCE_VERSION:=master/' package/kernel/rtl8821cu/Makefile
+    # sed -i 's/PKG_MIRROR_HASH:=.*/PKG_MIRROR_HASH:=skip/' package/kernel/rtl8821cu/Makefile
 
-    # 天灵 和openwrt 官方的主题必须 luci-theme-argon 这种 21 分支的主题
-    sed -ri 's/luci-theme-\S+/luci-theme-argon/g' feeds/luci/collections/luci/Makefile
-    sed -i 's/argonne=y/argon=y/' .config
-    # 这个不兼容 openwrt 
-    find -type d -name 'luci-*-argonne*' -exec rm -rf {} \;
-
-    sed -i 's/\+IPV6:luci-proto-ipv6//' feeds/luci/collections/luci/Makefile
-
-    svn export https://github.com/immortalwrt/immortalwrt/trunk/package/emortal/autocore   package/emortal/autocore
-    svn export https://github.com/immortalwrt/immortalwrt/trunk/package/emortal/ipv6-helper   package/emortal/ipv6-helper
-
-    cat > package/base-files/files/etc/uci-defaults/zzz-default-settings <<'EOF'
-# 默认密码 password
-# sed -i 's/root::0:0:99999:7:::/root:$1$V4UetPzk$CYXluq4wUazHjmCDBCqXF.:0:0:99999:7:::/g' /etc/shadow
-sed -i '/^root::/c root:$1$V4UetPzk$CYXluq4wUazHjmCDBCqXF.:0:0:99999:7:::' /etc/shadow
-EOF
-    echo 'CONFIG_LUCI_LANG_zh_Hans=y' >> .config
 fi
 
 
@@ -154,26 +98,6 @@ fi
 # rm cebdc1f94dcd6363da3a5d7e1e69fd741b8b718e.patch
 # sed -i 's/pwmchip1/pwmchip0/' target/linux/rockchip/armv8/base-files/usr/bin/fa-fancontrol.sh target/linux/rockchip/armv8/base-files/usr/bin/fa-fancontrol-direct.sh
 
-# 'package/feeds/others/luci-app-unblockneteasemusic/Makefile' has a dependency on 'ucode'
-[ ! -d package/utils/ucode ] && svn export https://github.com/coolsnowwolf/lede/trunk/package/utils/ucode  package/utils/ucode
-
-
-# https://github.com/coolsnowwolf/luci/issues/127
-[ -d package/lean/luci-app-filetransfer ] && sed -i '2a [ ! -f /etc/openwrt_release ] && exit 0' package/lean/luci-app-filetransfer/root/etc/uci-defaults/luci-filetransfer
-[ -f feeds/luci/applications/luci-app-unblockmusic/root/etc/init.d/unblockmusic ] && \
-    sed -i '1a [ ! -f /etc/openwrt_release ] && exit 0' feeds/luci/applications/luci-app-unblockmusic/root/etc/init.d/unblockmusic
-[ -f ./feeds/others/luci-app-argonne-config/root/etc/uci-defaults/luci-argonne-config ] && \
-    sed -i '1a [ ! -f /etc/openwrt_release ] && exit 0' ./feeds/others/luci-app-argonne-config/root/etc/uci-defaults/luci-argonne-config
-[ -f ./feeds/others/luci-theme-argonne/root/etc/uci-defaults/90_luci-theme-argonne ] && \
-    sed -i '1a [ ! -f /etc/openwrt_release ] && exit 0'  ./feeds/others/luci-theme-argonne/root/etc/uci-defaults/90_luci-theme-argonne
-
-#[ -f ./feeds/others/luci-theme-argonne/Makefile ] && sed -i '/LUCI_DEPENDS/s#=#&+libc#' ./feeds/others/luci-theme-argonne/Makefile
-if [ -f ./feeds/others/luci-theme-argonne/Makefile ];then
-    SED_NUM=$( grep -Pn '^\s*define\s+Package/\S+/postinst' ./feeds/others/luci-theme-argonne/Makefile |  awk -F: '$0~":"{print $1}')
-    if [ -n "SED_NUM" ];then
-        sed -i "$[SED_NUM+2]i [ ! -f /etc/openwrt_release ] && exit 0" ./feeds/others/luci-theme-argonne/Makefile
-    fi
-fi
 
 
 # unblockneteasemusic 的 状态判断是 exec 调用 ps 命令，它没适配 proc-ng-ps 命令会影响 
@@ -188,8 +112,6 @@ mkdir -p files/etc/uci-defaults/
 cp ${GITHUB_WORKSPACE}/scripts/uci-defaults/* files/etc/uci-defaults/
 chmod a+x files/etc/uci-defaults/*
 
-mkdir -p files/root/
-echo 'set paste' >> files/root/.vimrc
 
 # 预处理下载相关文件，保证打包固件不用单独下载
 # source ${GITHUB_WORKSPACE}/scripts/files/adh.sh
@@ -205,22 +127,6 @@ chmod a+x ${GITHUB_WORKSPACE}/build/scripts/*.sh
 # 放入升级脚本
 \cp -a ${GITHUB_WORKSPACE}/build/scripts/update.sh files/
 
-# 修改banner
-echo -e " zgz built on "$(TZ=Asia/Shanghai date '+%Y.%m.%d %H:%M') - ${GITHUB_RUN_NUMBER}"\n -----------------------------------------------------" >> package/base-files/files/etc/banner
 
-default_banner_file=$(find package/ -type f -name openwrt_banner -path '*/default-settings/files/openwrt_banner')
-[ -n "$default_banner_file" ] # 修改banner
-echo -e " zgz built on "$(TZ=Asia/Shanghai date '+%Y.%m.%d %H:%M') - ${GITHUB_RUN_NUMBER}"\n -----------------------------------------------------" >> $default_banner_file
-
-# mksquashfs 工具 segment fault
-# https://github.com/plougher/squashfs-tools/issues/190
-if [ -d feeds/packages/utils/squashfs-tools ];then
-    curl -sL https://raw.githubusercontent.com/coolsnowwolf/packages/caad6dedd4a029d10c6e75281e6e6e31d8d74eaf/utils/squashfs-tools/Makefile > feeds/packages/utils/squashfs-tools/Makefile
-fi
-
-# 修复 imageBuilder 打包 ntpdate 的 uci 错误
-if [ -f feeds/packages/net/ntpd/files/ntpdate.init ];then
-    sed -i '2a [ ! -f /etc/openwrt_release ] && exit 0' feeds/packages/net/ntpd/files/ntpdate.init
-fi
 
 # ---------- end -----------

@@ -8,10 +8,11 @@ lede 只有 master 分支，op 目前只有官方的 openwrt-21.02 分支看是�
 |  ------ | ------------------  | -------  |----  | ----  |
 | x86_64  | [lede](https://github.com/coolsnowwolf/lede)、[op](https://github.com/openwrt/openwrt/tree/openwrt-21.02) | ✔ | ✔ | 开启了很多无线和板载驱动 |
 | r2s  | [lede](https://github.com/coolsnowwolf/lede)、[op](https://github.com/openwrt/openwrt/tree/openwrt-21.02)、[DHDAXCW](https://github.com/DHDAXCW/op-rockchip/tree/stable)、[immortalwrt](https://github.com/immortalwrt/immortalwrt/tree/openwrt-21.02) | ✔ | ✔ | 骷髅头 DHDAXCW 支持usb wifi 不死机 | 
-| r4s  | [lede](https://github.com/coolsnowwolf/lede)、[DHDAXCW](https://github.com/DHDAXCW/op-rockchip/tree/stable)、[immortalwrt](https://github.com/immortalwrt/immortalwrt/tree/openwrt-18.06-k5.4) | ✔ | ✔ | op 官方的 21.02 target会变成r2s |
+| r4s  | [lede](https://github.com/coolsnowwolf/lede)、[DHDAXCW](https://github.com/DHDAXCW/op-rockchip/tree/stable)、[immortalwrt](https://github.com/immortalwrt/immortalwrt/tree/openwrt-18.06-k5.4) | ✔ | ✔ | op 的 21.02 target会变成r2s |
+|RaspberryPi4| [immortalwrt](https://github.com/immortalwrt/immortalwrt/tree/openwrt-18.06-k5.4) | ✔ | ✔ |  | 
 | r1s-h3  | [lede](https://github.com/coolsnowwolf/lede) | ✔ | ✔ | 暂时没添加其他源码，sd卡可以，emcc刷入无法启动，不是我的锅 | 
-| r1s-h5  | [immortalwrt](https://github.com/immortalwrt/immortalwrt/tree/openwrt-18.06-k5.4) | ✔ | ✔ | 暂时没添加其他源码 | 
-| doornet2  | [lede](https://github.com/coolsnowwolf/lede) | ✔ | ✔ | 暂时没添加其他源码 |
+| r1s-h5  | [immortalwrt](https://github.com/immortalwrt/immortalwrt/tree/openwrt-18.06-k5.4) | X | ✔ | 内存 500M，无法在线升级扩容 | 
+| doornet2  | [lede](https://github.com/coolsnowwolf/lede)、[DHDAXCW](https://github.com/DHDAXCW/op-rockchip/tree/stable) | ✔ | ✔ |  |
 | N1  | [lede](https://github.com/coolsnowwolf/lede) |  x | x | 暂时没空适配在线升级和slim | 
 | k2p  | [lede](https://github.com/coolsnowwolf/lede) |  x | x | 暂时没空适配在线升级和slim | 
 | sft1200  | [Siflower](https://github.com/Siflower/1806_SDK.git) |  x | x | 暂时没空适配在线升级和slim | 
@@ -38,8 +39,8 @@ https://github.com/zhangguanzhang/Actions-OpenWrt/releases/tag/test
 4. 默认密码均为 `password` ，路由器 ip 你可以电脑接它的 lan 后看网关 IP
 5. 初次升级的同时会扩容，**扩容完只有两个分区，剩余空间所有目录均可享用**，升级完后连上去，可以自行安装想要的软件源，例如下面
    1. `opkg update`
-   2. `opkg install luci-app-dockerman`
-6. 推荐使用 `squashfs` 格式固件，因为 `ext4` 格式的断电关机会有几率开机变成根分区只读，我的 r2s 和其他人都遇到过。
+   2. `opkg install luci-i18n-dockerman-zh-cn` 有 `i18n-$pkg_name` 的就优先安装它，然后刷新 web 就能看到新服务了
+6. 推荐使用 `squashfs` 格式固件，因为 `ext4` 格式的断电关机会有几率开机变成根分区只读，我的 r2s 和其他人都遇到过。如果你使用 `squashfs` 格式出现 `I/O Error` 请使用 `diskgenius` 之类扫描看看存在坏道否。
 7. 可在线升级和多源码的都是支持切版本，例如当前是 lede-master 的 r2s 想切到 DHDAXCW 的 stable:
    1. `SKIP_BACK=1 REPO=DHDAXCW IM_BRANCH=stable bash -x /update.sh`
    2. 注意这样切换网卡配置会带过去后，可能web网络那里显示有问题，遇到后可以自行删掉网卡配置 `/etc/config/network` 重启，然后接 lan 后访问 web 参照 `/etc/config/network.bak` 配置之前的网络信息重新配置网络
@@ -49,7 +50,7 @@ https://github.com/zhangguanzhang/Actions-OpenWrt/releases/tag/test
 1. 创建 img 文件，挂载使用 zstd 成目录，整个源码目录都会被 zstd 压缩
 2. 然后使用 gh cli 登录和上传 split 文件，后续下载合并后解压再 mount img 成目录，就是缓存了之前的构建结果了
 3. fork的话，想用我一样的 cache 和 slim 构建必须阿里云镜像仓库相关token，然后 gh cli 的token设置
-
+4. 貌似一个 target 可以编译出多个，可能后续需要兼容下，例如 r4s 和 r4se
 
 ## 分隔
 
@@ -162,6 +163,23 @@ https://www.right.com.cn/forum/thread-3682029-1-1.html
 - https://mlapp.cn/1009.html
 - https://www.v2rayssr.com/openwrtimg.html/comment-page-1
 - https://mianao.info/2020/05/05/%E7%BC%96%E8%AF%91%E6%9B%B4%E6%96%B0OpenWrt-PassWall%E5%92%8CSSR-plus%E6%8F%92%E4%BB%B6
+- [构建一个 op 的包的时候 Makefile 如何编写和讲解](https://blog.51cto.com/u_15346415/3694615)
+- [Makefile 框架分析](https://www.cnblogs.com/happygirl-zjj/p/6008239.html)
+
+## 缓存和避免包的重复编译
+
+缓存见 cache.sh 。主要是包的重复编译如何避免，先看单个包 `./package/utils/lua` 的编译步骤：
+
+1. 在 make 时，make 读取到 `package/utils/lua/Makefile` 文件内容，包含版本和下载地址。
+2. 如果 git 或 svn 源，那么就会在 tmp/dl/ 目录下将源代码 clone 下来。然后，将 clone 下来的源码删除 .git 或 .svn 目录删除，然后压缩成 `lua-x.x.x.tar.gz` 文件，并复制到 dl/ 目录下。
+3. 在编译前段，将 dl/ 目录下的 lua-x.x.x.tar.gz 文件解压到 `build_dir/target-<arch>/lua-x.x.x/` 目录下。
+4. 进入 `build_dir/target-<arch>/lua-x.x.x/` 执行 `./configure`，`make`，`make install`。
+5. make install 会将生成的二进制文件安装到 `build_dir/target-<arch>/lua-x.x.x/ipkg-<arch>/` 目录下。
+6. 最后将 `build_dir/target-<arch>/lua-x.x.x/ipkg-<arch>/` 打包成 `lua-x.x.x-1_<arch>.ipk`，并复制到 `bin/<arch>/packages/base/` 。
+
+可以大概看看 https://github.com/openwrt/openwrt/blob/master/include/package-ipkg.mk ，实际上 `build_dir/target-<arch>/lua-x.x.x/` 目录下有一些隐藏文件，`.built`、`.built_check` 可能是再次编译的判断文件
+
+## 一些技巧
 
 dnsmasq 取消 `/etc/resolv.conf` 里的 `nameserver ::1`
 

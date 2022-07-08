@@ -1,5 +1,6 @@
 #!/bin/bash
 EnableDocker=true
+
 UdateFeeds=true
 InstallFeeds=true
 
@@ -8,12 +9,6 @@ UseCache=true
 AutoBuildTimeOut=true
 
 MakeDownload=true
-ClearPkg=true
+ClearPkg=false
 
-firmware_wildcard=x86-64
-
-# x86_64 还是使用 github release 的方式暂存缓存吧，其余的后面看看优化
-#cache_func=ghcr
-
-cache_release_name=cache-x86_64
-cache_repo=action_cache
+firmware_wildcard=rpi-4
