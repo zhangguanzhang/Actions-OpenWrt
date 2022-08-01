@@ -30,3 +30,5 @@ if [ -n "${envOverride}" ];then
         SET_ENV `tr '=' ' ' <<< $env_ins`
     done
 fi
+
+SET_ENV GOPROXY https://goproxy.cn,https://mirrors.aliyun.com/goproxy/,https://goproxy.io,direct

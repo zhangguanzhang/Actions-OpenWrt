@@ -51,12 +51,29 @@ if [ "$repo_name" = 'lede' ];then
         done
     fi
 
-    # use latest driver of rtl8821CU
-    sed -i 's/PKG_SOURCE_VERSION:=.*/PKG_SOURCE_VERSION:=master/' package/kernel/rtl8821cu/Makefile
-    sed -i 's/PKG_MIRROR_HASH:=.*/PKG_MIRROR_HASH:=skip/' package/kernel/rtl8821cu/Makefile
+    # #use latest driver of rtl8821CU
+    # if [ -f package/kernel/rtl8821cu/Makefile ];then
+    # sed -i 's/PKG_SOURCE_VERSION:=.*/PKG_SOURCE_VERSION:=master/' package/kernel/rtl8821cu/Makefile
+    # sed -i 's/PKG_MIRROR_HASH:=.*/PKG_MIRROR_HASH:=skip/' package/kernel/rtl8821cu/Makefile
+    # fi
 
 fi
 
+if [ "$repo_name" = 'lede' ] || [ "$repo_name" == 'DHDAXCW' ];then
+    # https://github.com/coolsnowwolf/lede/issues/9803
+    # https://github.com/coolsnowwolf/lede/issues/9939
+    if echo "$kernel_ver" | grep -Pq '5.1[89]';then
+        sed -ri '/^KERNEL_PATCHVER=/s#'"${kernel_ver}"'#5.4#' target/linux/rockchip/Makefile
+    fi
+    # https://github.com/coolsnowwolf/lede/issues/9922
+    kernel_ver=$(grep -Po '^KERNEL_PATCHVER=\K\S+' target/linux/rockchip/Makefile)
+    if echo "$kernel_ver" | grep -Pq '5.1[589]';then
+        sed -ri '/kmod-(ath6k|carl9170|libertas-usb|rsi91x)/d' .config
+    fi
+    # https://github.com/coolsnowwolf/lede/issues/9922
+    sed -ri '/^\s*TARGET_DEVICES\s.+?(fastrhino_r66s|firefly_station-p2|friendlyelec_nanopi-r5s)/d' target/linux/rockchip/image/armv8.mk
+
+fi
 
 # merge_package "-b 18.06 https://github.com/jerrykuku/luci-theme-argon"
 # merge_package "https://github.com/jerrykuku/luci-app-argon-config"

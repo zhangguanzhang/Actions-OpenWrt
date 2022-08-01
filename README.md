@@ -4,30 +4,27 @@
 
 lede 只有 master 分支，op 目前只有官方的 openwrt-21.02 分支看是能用的地步
 
-|  设备   | 支持的 源码-分支 列表  | 可脚本在线升级 | slim本地源 |  备注 |
+|  设备(👇点击下载)   | 支持的 源码-分支 列表  | 可脚本在线升级 | slim本地源 |  备注 |
 |  ------ | ------------------  | -------  |----  | ----  |
-| x86_64  | [lede](https://github.com/coolsnowwolf/lede)、[op](https://github.com/openwrt/openwrt/tree/openwrt-21.02) | ✔ | ✔ | 开启了很多无线和板载驱动 |
-| r2s  | [lede](https://github.com/coolsnowwolf/lede)、[op](https://github.com/openwrt/openwrt/tree/openwrt-21.02)、[DHDAXCW](https://github.com/DHDAXCW/op-rockchip/tree/stable)、[immortalwrt](https://github.com/immortalwrt/immortalwrt/tree/openwrt-21.02) | ✔ | ✔ | 骷髅头 DHDAXCW 支持usb wifi 不死机 | 
-| r4s  | [lede](https://github.com/coolsnowwolf/lede)、[DHDAXCW](https://github.com/DHDAXCW/op-rockchip/tree/stable)、[immortalwrt](https://github.com/immortalwrt/immortalwrt/tree/openwrt-18.06-k5.4) | ✔ | ✔ | op 的 21.02 target会变成r2s |
-|RaspberryPi4| [immortalwrt](https://github.com/immortalwrt/immortalwrt/tree/openwrt-18.06-k5.4) | ✔ | ✔ |  | 
-| r1s-h3  | [lede](https://github.com/coolsnowwolf/lede) | ✔ | ✔ | 暂时没添加其他源码，sd卡可以，emcc刷入无法启动，不是我的锅 | 
-| r1s-h5  | [immortalwrt](https://github.com/immortalwrt/immortalwrt/tree/openwrt-18.06-k5.4) | X | ✔ | 内存 500M，无法在线升级扩容 | 
-| doornet2  | [lede](https://github.com/coolsnowwolf/lede)、[DHDAXCW](https://github.com/DHDAXCW/op-rockchip/tree/stable) | ✔ | ✔ |  |
+| [x86_64](https://github.com/zhangguanzhang/Actions-OpenWrt/releases/tag/x86_64)  | [lede](https://github.com/coolsnowwolf/lede)、[op](https://github.com/openwrt/openwrt/tree/openwrt-21.02) | ✔ | ✔ | 开启了很多无线和板载驱动 |
+| [r2s](https://github.com/zhangguanzhang/Actions-OpenWrt/releases/tag/r2s)  | [lede](https://github.com/coolsnowwolf/lede)、[op](https://github.com/openwrt/openwrt/tree/openwrt-21.02)、[DHDAXCW](https://github.com/DHDAXCW/op-rockchip/tree/stable)、[immortalwrt](https://github.com/immortalwrt/immortalwrt/tree/openwrt-21.02) | ✔ | ✔ | 骷髅头 DHDAXCW 支持usb wifi 不死机 | 
+| [r4s/r4se](https://github.com/zhangguanzhang/Actions-OpenWrt/releases/tag/r4s)  | [lede](https://github.com/coolsnowwolf/lede)、[DHDAXCW](https://github.com/DHDAXCW/op-rockchip/tree/stable)、[immortalwrt](https://github.com/immortalwrt/immortalwrt/tree/openwrt-18.06-k5.4) | ✔ | ✔ | op 的 21.02 target会变成r2s，喜欢op的用天灵的就行了，r4se用lede和骷髅头源码编译的 |
+| [r5s](https://github.com/zhangguanzhang/Actions-OpenWrt/releases/tag/r5s)  | [lede](https://github.com/coolsnowwolf/lede)、[DHDAXCW/lede](https://github.com/DHDAXCW/lede) | ✔ | ✔ | 刷机类似 doornet2，[教程](https://github.com/DHDAXCW/DoorNet2/blob/main/emmc.md) |
+| [RaspberryPi4](https://github.com/zhangguanzhang/Actions-OpenWrt/releases/tag/RaspberryPi4)| [immortalwrt](https://github.com/immortalwrt/immortalwrt/tree/openwrt-18.06-k5.4) | ✔ | ✔ |  | 
+| [r1s-h3](https://github.com/zhangguanzhang/Actions-OpenWrt/releases/tag/r1s-h3)  | [lede](https://github.com/coolsnowwolf/lede) | ✔ | ✔ | 暂时没添加其他源码，sd卡可以，emcc刷入无法启动，不是我的锅 | 
+| [r1s-h5](https://github.com/zhangguanzhang/Actions-OpenWrt/releases/tag/r1s-h5)  | [immortalwrt](https://github.com/immortalwrt/immortalwrt/tree/openwrt-18.06-k5.4) | X | ✔ | 内存 500M，无法在线升级扩容 | 
+| [doornet2](https://github.com/zhangguanzhang/Actions-OpenWrt/releases/tag/doornet2)  | [lede](https://github.com/coolsnowwolf/lede)、[DHDAXCW](https://github.com/DHDAXCW/op-rockchip/tree/doornet2) | ✔ | ✔ |  |
 | N1  | [lede](https://github.com/coolsnowwolf/lede) |  x | x | 暂时没空适配在线升级和slim | 
 | k2p  | [lede](https://github.com/coolsnowwolf/lede) |  x | x | 暂时没空适配在线升级和slim | 
 | sft1200  | [Siflower](https://github.com/Siflower/1806_SDK.git) |  x | x | 暂时没空适配在线升级和slim | 
 
 
-推荐使用 `slim-squashfs` 本地源的版本，可以在下面 `latest` 或者 `test` 的 release 下载：
+推荐使用 `slim-squashfs` 本地源的版本，可以在自行 release 下载，或者点击上面的 `设备` 栏目下的设备跳转过去：
 
 ```
-https://github.com/zhangguanzhang/Actions-OpenWrt/releases/tag/latest
-https://github.com/zhangguanzhang/Actions-OpenWrt/releases/tag/test
-# 上面的 latest 没有就用 test的，下载慢可以下面的 gh 代理
+下载慢可以下面的 gh 代理
 # https://github.cooluc.com/
 ```
-
-`latest` 分支存放最新稳定的，`test` 分支是有问题的时候我 check 后尝试的修复，以及实验了稳定的包会转到 `latest`
 
 ### 在线升级
 

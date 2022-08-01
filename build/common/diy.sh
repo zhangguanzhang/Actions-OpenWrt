@@ -2,6 +2,7 @@
 
 # 此脚本工作目录就是 op 的目录，此脚本用于搞一些公共 diy-part2.sh
 # 这里添加的一些包，也适用于 非 updateFeeds 的
+readonly CUR_DIR=$(cd $(dirname ${BASH_SOURCE:-$0}); pwd)
 
 [ -f "$GITHUB_ENV" ] && source $GITHUB_ENV
 
@@ -77,7 +78,12 @@ EOF
 sed -i '/^root::/c root:$1$V4UetPzk$CYXluq4wUazHjmCDBCqXF.:0:0:99999:7:::' /etc/shadow
 EOF
     echo 'CONFIG_LUCI_LANG_zh_Hans=y' >> .config
-
+    
+    # 21/22  zh_Hans  19 以下  zh-cn
+    if echo $repo_branch | grep -Pq '2[1-3]\.0';then
+       find -type d -name zh-cn -path '*/luci-app-*/po/zh-cn' -exec bash -c 'ln -sf {} $(dirname {})/zh_Hans' \;
+       bash ${CUR_DIR}/convert_translation.sh
+    fi
 fi
 
 mkdir -p files/root/

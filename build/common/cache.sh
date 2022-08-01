@@ -4,7 +4,7 @@ if [ -z "$repository_owner" ] && [ -f "$GITHUB_ENV" ];then
     source $GITHUB_ENV
 fi
 
-: ${cache_func:=dockerhub}
+: ${cache_func:=dockerhub} ${Need_Avail_G_NUM:=15}
 #: ${cache_func:=github_release}
 
 # cache 实现要求
@@ -12,6 +12,30 @@ fi
 # 下载完的时候还要合并文件
 
 # ghcr 不建议用，辣鸡
+
+
+function clean_dl(){
+    if [ -z "$no_imageBuilder" ] && [ `grep -E "${cache_name}.img.zst" /tmp/cache_list| wc -l` -ge 7 ] ;then
+        rm -rf openwrt/dl
+        echo "dl 缓存清理"
+    else
+        echo "dl 缓存命中"
+    fi
+    if [ -f dl/time ];then
+        last_time=$(cat dl/time)
+        # echo 3*24*60*60 | bc # 超过上一次三天就清理一次 
+        if [ $(( `date +%s` - $last_time  )) -ge $[15*24*60*60] ];then
+            echo "dl 缓存清理"
+            rm -rf dl
+        else
+            echo "dl 缓存命中"
+        fi
+    else
+        mkdir -p dl
+        date +%s > dl/time
+    fi
+}
+
 
 # $1=download/upload $2=file_name
 function github_release(){
@@ -30,7 +54,7 @@ case $action in
         gh release -R ${cache_repo} list | grep -Ew ${cache_release_name} || gh release -R ${cache_repo} create ${cache_release_name} -t '' -n ''
         gh release -R ${cache_repo} view ${cache_release_name} 2>/dev/null | grep -Po 'asset:\s+\K\S+' > /tmp/cache_list || true
         if grep -E "${cache_name}.img.zst" /tmp/cache_list;then
-            echo 'start download cache:' `grep -E "${cache_name}.img.zst" /tmp/cache_list`
+            echo 'start download cache:' `grep -E "^${cache_name}.img.zst" /tmp/cache_list`
             # TODO
             # 有小几率会下载失败
             gh release -R ${cache_repo} download ${cache_release_name} -p "${cache_name}.img.zst.*"
@@ -48,11 +72,22 @@ case $action in
         fi
     ;;
     get_reserved_time)
-        echo 20
+        cache_file_count=`grep -E "${cache_name}.img.zst" /tmp/cache_list| wc -l`
+        if [ "$cache_file_count" -eq 0 ];then
+            echo 16
+        elif [ "$cache_file_count" -lt 10 ];then
+            echo 18
+        else
+            echo 20
+        fi 
     ;;
     clean)
+        pushd openwrt
+        clean_dl
+        popd
         if [ -z "$no_imageBuilder" ] && [ `grep -E "${cache_name}.img.zst" /tmp/cache_list| wc -l` -ge 10 ];then
-            rm -rf openwrt/build_dir
+            #echo "clean openwrt/build_dir"
+            true
         fi
     ;;
     upload)
@@ -60,18 +95,20 @@ case $action in
         # 可能存在当前上传的切割文件数量少于 cache release 上的，需要提前删除
         gh release -R ${cache_repo} view ${cache_release_name}  2>/dev/null | grep -Po "asset:\s+\K${cache_name}.img.zst.\d+" | \
             xargs -r -n1 gh release -R ${cache_repo} delete-asset ${cache_release_name}  -y
-        if [ "$Avail_G_NUM" -gt 20 -a "$cache_file_count" -lt 10 ] && zstdmt -c --long ${cache_name}.img | split --numeric=1 -b 2000m - ${cache_name}.img.zst.;then
+        if [ "$Avail_G_NUM" -gt ${Need_Avail_G_NUM} -a "$cache_file_count" -lt 10 ] && zstdmt -c --long ${cache_name}.img | split --numeric=1 -b 2000m - ${cache_name}.img.zst.;then
             ls -l
             rm -f ${cache_name}.img # 减少容量
             gh release -R ${cache_repo} upload ${cache_release_name} ${cache_name}.img.zst.* --clobber
+            last_file_name=$(ls ${cache_name}.img.zst.* | tail -n1)
             rm -f ${cache_name}.img.zst.*
         else
             echo "上传失败，容量爆满，开始单线程顺序临时文件占用方式上传"
             df -h
             rm -f ${cache_name}.img.zst.*
             zstdmt -c --long ${cache_name}.img | split --numeric=1 -b 2000m \
-                --filter "cat /dev/stdin > \$FILE;  gh release -R ${cache_repo} upload ${cache_release_name} \$FILE --clobber && rm -f \$FILE && echo \$FILE Successfully uploaded" - ${cache_name}.img.zst.
+                --filter "cat /dev/stdin > \$FILE;  gh release -R ${cache_repo} upload ${cache_release_name} \$FILE --clobber && rm -f \$FILE && echo \$FILE Successfully uploaded && echo \$FILE > /tmp/count_num" - ${cache_name}.img.zst.
             rm -f ${cache_name}.img # 减少容量
+            last_file_name=$(cat /tmp/count_num)
         fi
     ;;
     *)
@@ -108,7 +145,7 @@ function ghcr(){
 case $action in
     download)
         # 列表文件不要动，后面上传后清理缓存会用到
-        skopeo --insecure-policy list-tags docker://ghcr.io/${repo_user}/openwrt_cache 2>/dev/null | jq -r '.Tags[]' | grep "${cache_name}.img.zst" > /tmp/cache_list
+        skopeo --insecure-policy list-tags docker://ghcr.io/${repo_user}/openwrt_cache 2>/dev/null | jq -r '.Tags[]' | grep -P "^${cache_name}.img.zst" > /tmp/cache_list
         if grep -E "${cache_name}.img.zst" /tmp/cache_list;then
             echo 'start download cache:' `grep -E "${cache_name}.img.zst" /tmp/cache_list`
             cat /tmp/cache_list | parallel -j3 "docker pull ghcr.io/${repo_user}/openwrt_cache:{}"
@@ -136,18 +173,28 @@ case $action in
         fi
     ;;
     get_reserved_time)
-        echo 22
+        cache_file_count=`grep -E "${cache_name}.img.zst" /tmp/cache_list| wc -l`
+        if [ "$cache_file_count" -eq 0 ];then
+            echo 17
+        elif [ "$cache_file_count" -lt 10 ];then
+            echo 20
+        else
+            echo 23
+        fi 
     ;;
     clean)
+        pushd openwrt
+        clean_dl
+        popd
         if [ -z "$no_imageBuilder" ] && [ `grep -E "${cache_name}.img.zst" /tmp/cache_list| wc -l` -ge 10 ];then
-            echo "clean openwrt/build_dir"
-            rm -rf openwrt/build_dir
+            #echo "clean openwrt/build_dir"
+            true
         fi
     ;;
     upload)
         cache_file_count=`grep -E "${cache_name}.img.zst" /tmp/cache_list| wc -l`
         # 不行 skopeo --insecure-policy delete --authfile ~/.docker/config.json docker://ghcr.io/${repo_user}/openwrt_cache:{}
-        if [ "$Avail_G_NUM" -gt 20 -a "$cache_file_count" -lt 10 ] && zstdmt -c --long ${cache_name}.img | split --numeric=1 -b 2000m - ${cache_name}.img.zst.;then
+        if [ "$Avail_G_NUM" -gt ${Need_Avail_G_NUM} -a "$cache_file_count" -lt 10 ] && zstdmt -c --long ${cache_name}.img | split --numeric=1 -b 2000m - ${cache_name}.img.zst.;then
             rm -f ${cache_name}.img # 减少容量
             last_file_name=$(ls ${cache_name}.img.zst.* | tail -n1)
             ls ${cache_name}.img.zst.*| parallel -j4 "docker_build_push {}"
@@ -214,7 +261,7 @@ function dockerhub(){
 case $action in
     download)
         # 列表文件不要动，后面上传后清理缓存会用到
-        skopeo --insecure-policy list-tags docker://${repo_user}/openwrt_cache 2>/dev/null | jq -r '.Tags[]' | grep "${cache_name}.img.zst" > /tmp/cache_list
+        skopeo --insecure-policy list-tags docker://${repo_user}/openwrt_cache 2>/dev/null | jq -r '.Tags[]' | grep "^${cache_name}.img.zst" > /tmp/cache_list
         if grep -E "${cache_name}.img.zst" /tmp/cache_list;then
             echo 'start download cache:' `grep -E "${cache_name}.img.zst" /tmp/cache_list`
             cat /tmp/cache_list | parallel -j3 "docker pull ${repo_user}/openwrt_cache:{}"
@@ -246,22 +293,24 @@ case $action in
         if [ "$cache_file_count" -eq 0 ];then
             echo 18
         elif [ "$cache_file_count" -lt 10 ];then
-            echo 22
+            echo 21
         else
-            echo 25
-        fi
-        
+            echo 23
+        fi 
     ;;
     clean)
+        pushd openwrt
+        clean_dl
+        popd
         if [ -z "$no_imageBuilder" ] && [ `grep -E "${cache_name}.img.zst" /tmp/cache_list| wc -l` -ge 10 ];then
-            echo "clean openwrt/build_dir"
-            rm -rf openwrt/build_dir
+            # echo "clean openwrt/build_dir"
+            true
         fi
     ;;
     upload)
         cache_file_count=`grep -E "${cache_name}.img.zst" /tmp/cache_list| wc -l`
         # 不行 skopeo --insecure-policy delete --authfile ~/.docker/config.json docker://${repo_user}/openwrt_cache:{}
-        if [ "$Avail_G_NUM" -gt 20 -a "$cache_file_count" -lt 10 ] && zstdmt -c --long ${cache_name}.img | split --numeric=1 -b 2000m - ${cache_name}.img.zst.;then
+        if [ "$Avail_G_NUM" -gt ${Need_Avail_G_NUM} -a "$cache_file_count" -lt 10 ] && zstdmt -c --long ${cache_name}.img | split --numeric=1 -b 2000m - ${cache_name}.img.zst.;then
             rm -f ${cache_name}.img # 减少容量
             last_file_name=$(ls ${cache_name}.img.zst.* | tail -n1)
             ls ${cache_name}.img.zst.*| parallel -j4 "docker_build_push {}"

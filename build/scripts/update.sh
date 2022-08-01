@@ -578,7 +578,17 @@ function main(){
         arch=`uname -m`
         [ $arch == 'x86_64' ] && board_id='x86_64'
     else
-        board_id="$MATRIX_TARGET"
+        if [ -n "$MATRIX_TARGET_LIST"  ];then
+            board_file_id=$(jsonfilter -e '@["model"].id' < /etc/board.json )
+            for t in `echo $MATRIX_TARGET_LIST| sed 's/,/ /'`;do
+                if echo $board_file_id | grep -Eq "${t}\$";then
+                    board_id="$t"
+                    break
+                fi
+            done
+        else
+            board_id="$MATRIX_TARGET"
+        fi
     fi
 
     tmp_mountpoint_end_size=2600MB

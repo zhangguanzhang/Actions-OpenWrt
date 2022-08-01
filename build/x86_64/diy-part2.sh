@@ -15,9 +15,9 @@
 
 
 # rtl8812bu 貌似无法工作
-rm -rf package/kernel/rtl88x2bu
-git clone --depth=1 -b openwrt-21.02 https://github.com/erintera/openwrt-rtl8812bu-package.git package/kernel/rtl88x2bu
-echo 'CONFIG_PACKAGE_kmod-rtl88x2bu=y' >> .config
+# rm -rf package/kernel/rtl88x2bu
+# git clone --depth=1 -b openwrt-21.02 https://github.com/erintera/openwrt-rtl8812bu-package.git package/kernel/rtl88x2bu
+# echo 'CONFIG_PACKAGE_kmod-rtl88x2bu=y' >> .config
 
 
 

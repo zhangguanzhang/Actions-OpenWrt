@@ -6,20 +6,22 @@ if [ "$target" = '-full' ];then
     target=''
 fi
 
-function upload_dockerhub(){
+[ -z "$real_branch" ] && real_branch=${GITHUB_REF##*/}
 
+function upload_dockerhub(){
+    local DEVICE_NAME=$1
     local hub_img=zhangguanzhang/${DEVICE_NAME,,} BUILD_DIR=$(mktemp -d)
-    local BRANCH=${GITHUB_REF##*/}
-    local file=$(basename $1)
+    local BRANCH=${real_branch}
+    local file=$(basename $2)
     local tag=release-$(date +%Y-%m-%d)
     local FSTYPE suffix
     FSTYPE=$( echo $file | grep -Po '\-\K(ext4|squashfs)(?=-)' )
     # .img .img.gz 啥的后缀
     suffix=${file#*.}
 
-    cp $1 ${BUILD_DIR}/openwrt-${DEVICE_NAME}-${FSTYPE}.${suffix}
-    # cp $(dirname $1)/{sha256sums,config.buildinfo,feeds.buildinfo,version.buildinfo} ${BUILD_DIR}/
-    cp $(dirname $1)/sha256sums ${BUILD_DIR}/
+    cp $2 ${BUILD_DIR}/openwrt-${DEVICE_NAME}-${FSTYPE}.${suffix}
+    # cp $(dirname $2)/{sha256sums,config.buildinfo,feeds.buildinfo,version.buildinfo} ${BUILD_DIR}/
+    cp $(dirname $2)/sha256sums ${BUILD_DIR}/
     echo 'Dockerfile' > ${BUILD_DIR}/.dockerignore
 cat >${BUILD_DIR}/Dockerfile << EOF
 FROM alpine
@@ -49,7 +51,7 @@ EOF
 
 function upload(){
     if [ -z "${NOT_PUSH}" ];then
-        upload_dockerhub $1
+        upload_dockerhub $1 $2
     fi    
 }
 
@@ -57,6 +59,14 @@ firmware_path=$( dirname $( find $GITHUB_WORKSPACE/openwrt/bin/targets -type f -
 
 [ -n "$exclude_str" ] && exclude_str="|${exclude_str#|}"
 # 有些 build_target 没设置 exclude_str
-for file in $(ls ${firmware_path}/*-*-* | grep -Pv "kernel|rootfs|manifest${exclude_str}" | grep -P 'squashfs|ext4' );do
-    upload $file
-done
+if echo $multi_target | grep -Pq ,;then
+    for target_ins in `echo $multi_target| sed -e 's/,/ /' -e "s/'//g"`;do
+        for file in $(ls ${firmware_path}/*-${target_ins}-* | grep -Pv "kernel|rootfs|manifest${exclude_str}" | grep -P 'squashfs|ext4' );do
+            upload $target_ins $file
+        done
+    done
+else
+    for file in $(ls ${firmware_path}/*-*-* | grep -Pv "kernel|rootfs|manifest${exclude_str}" | grep -P 'squashfs|ext4' );do
+        upload ${DEVICE_NAME} $file
+    done
+fi

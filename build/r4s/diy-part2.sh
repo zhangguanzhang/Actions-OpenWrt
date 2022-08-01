@@ -13,6 +13,7 @@
 # Modify default IP
 #sed -i 's/192.168.1.1/192.168.50.5/g' package/base-files/files/bin/config_generate
 
+[ -f "$GITHUB_ENV" ] && source $GITHUB_ENV
 
 kernel_ver=$(grep -Po '^KERNEL_PATCHVER=\K\S+' target/linux/rockchip/Makefile)
 
@@ -52,14 +53,33 @@ if [ "$repo_name" = 'lede' ];then
     fi
 
     # use latest driver of rtl8821CU
-    sed -i 's/PKG_SOURCE_VERSION:=.*/PKG_SOURCE_VERSION:=master/' package/kernel/rtl8821cu/Makefile
-    sed -i 's/PKG_MIRROR_HASH:=.*/PKG_MIRROR_HASH:=skip/' package/kernel/rtl8821cu/Makefile
+    if [ -f package/kernel/rtl8821cu/Makefile ];then
+        sed -i 's/PKG_SOURCE_VERSION:=.*/PKG_SOURCE_VERSION:=master/' package/kernel/rtl8821cu/Makefile
+        sed -i 's/PKG_MIRROR_HASH:=.*/PKG_MIRROR_HASH:=skip/' package/kernel/rtl8821cu/Makefile
+    fi
 
     # https://github.com/coolsnowwolf/lede/issues/9822
-    if [ "$kernel_ver" = '5.18' ] && grep -Pq '^CONFIG_PACKAGE_kmod-gpu-lima=y' .config;then
+    if echo "$kernel_ver" | grep -Pq '5.1[89]'  && grep -Pq '^CONFIG_PACKAGE_kmod-gpu-lima=y' .config;then
         sed -ri '/^KERNEL_PATCHVER=/s#=5.[0-9]+$#=5.15#' target/linux/rockchip/Makefile
     fi
+    # https://github.com/coolsnowwolf/lede/issues/9922
+    sed -ri '/^\s*TARGET_DEVICES\s.+?(fastrhino_r66s|firefly_station-p2|friendlyelec_nanopi-r5s)/d' target/linux/rockchip/image/armv8.mk
 fi
+
+if echo "$repo_name" | grep -Pq 'DHDAXCW|lede' ;then
+    echo "firmware_wildcard=r4s,r4se" >> $GITHUB_ENV
+    sed -ri '/friendlyarm_nanopi-r4s=y/d' .config
+    sed -i "2r "<(
+cat  <<'EOF' | sed -r 's#^\s+#\t#'
+CONFIG_TARGET_MULTI_PROFILE=y
+CONFIG_TARGET_DEVICE_rockchip_armv8_DEVICE_friendlyarm_nanopi-r4s=y
+CONFIG_TARGET_DEVICE_rockchip_armv8_DEVICE_friendlyarm_nanopi-r4se=y
+EOF
+  ) .config
+    true
+fi
+
+
 
 # https://github.com/coolsnowwolf/lede/pull/9059
 # https://github.com/immortalwrt/immortalwrt/issues/735
@@ -73,11 +93,6 @@ if [ "$repo_name" != 'lede' ] && [ "$repo_name" != 'DHDAXCW' ];then
     fi
     # https://github.com/immortalwrt/immortalwrt/discussions/736
     if [ "$repo_branch" = 'openwrt-18.06-k5.4' ];then
-        # svn export https://github.com/coolsnowwolf/packages/trunk/net/qBittorrent        ./feeds/packages/net/qBittorrent
-        # svn export https://github.com/coolsnowwolf/packages/trunk/net/qBittorrent-static ./feeds/packages/net/qBittorrent-static
-        # merge_package https://github.com/coolsnowwolf/packages/trunk/net/qBittorrent
-        # merge_package https://github.com/coolsnowwolf/packages/trunk/net/qBittorrent-static
-        # sed -ri '/^LUCI_DEPENDS/s#qBittorrent-Enhanced-Edition#qBittorrent#' ./feeds/luci/applications/luci-app-qbittorrent/Makefile
         if [ -z "$(awk '/^CMAKE_HOST_OPTIONS/{flag=1}flag==1{if($0~"DFEATURE_glib=OFF"){print 1}}flag==1&&(flag==1)&&/^\s*$/{exit;}' ./feeds/packages/libs/qt6base/Makefile)" ];then
             sed -ri '/^CMAKE_HOST_OPTIONS/r '<(echo -e '\t-DFEATURE_glib=OFF \\') ./feeds/packages/libs/qt6base/Makefile
         fi
@@ -89,7 +104,9 @@ if [ "$repo_name" != 'lede' ] && [ "$repo_name" != 'DHDAXCW' ];then
         fi
     fi
     # 修复 openwrt r4s target 编译完成变成 r2s 的文件名
-    if ! grep -Eq nanopi-r4s target/linux/rockchip/image/armv8.mk ;then
+    # 2022/08/01 还是无法编译成功，懒得搞官方的了
+    if [ "$repo_name" == 'openwrt' ];then
+        if ! grep -Eq nanopi-r4s target/linux/rockchip/image/armv8.mk ;then
 cat >> target/linux/rockchip/image/armv8.mk <<'EOF'
 
 define Device/friendlyarm_nanopi-r4s
@@ -104,6 +121,12 @@ endef
 TARGET_DEVICES += friendlyarm_nanopi-r4s
 
 EOF
+            svn export https://github.com/immortalwrt/immortalwrt/branches/${repo_branch}/package/boot/arm-trusted-firmware-rockchip-vendor \
+                package/boot/arm-trusted-firmware-rockchip-vendor
+            rm -rf package/boot/uboot-rockchip
+            svn export https://github.com/immortalwrt/immortalwrt/branches/${repo_branch}/package/boot/uboot-rockchip \
+                package/boot/uboot-rockchip
+        fi
     fi
 fi
 

@@ -1,3 +1,4 @@
+
 rm -rf package/community
 mkdir package/community
 
@@ -36,6 +37,15 @@ EOF
       fi
     fi
 fi
+
+# sed -i 's|kmod-brcmfmac brcmfmac-firmware-4366c0-pcie|kmod-brcmfmac k3wifi k3screenctrl|g' target/linux/bcm53xx/image/Makefile
+# # k3 proprietary wifi driver
+# svn export -q https://github.com/coolsnowwolf/lede/trunk/package/lean/k3-brcmfmac4366c-firmware package/k3/k3wifi
+
+git clone --depth=1 https://github.com/lwz322/luci-app-k3screenctrl.git package/community/luci-app-k3screenctrl
+git clone --depth=1 https://github.com/lwz322/k3screenctrl_build.git  package/community/k3screenctrl_build
+echo 'CONFIG_PACKAGE_luci-app-k3screenctrl=y'>> .config
+
 
 chmod a+x ${GITHUB_WORKSPACE}/build/scripts/*.sh
 \cp -a ${GITHUB_WORKSPACE}/build/scripts/update.sh files/

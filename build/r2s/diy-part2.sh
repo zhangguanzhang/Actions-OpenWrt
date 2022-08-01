@@ -61,21 +61,27 @@ if [ "$repo_name" = 'lede' ];then
 
     # https://github.com/coolsnowwolf/lede/issues/9803
     # lede 暂时删掉 ath6kl ，原因是 https://github.com/coolsnowwolf/lede/commit/66d19a4e3673b30594b5de3b8d226160a0032af5 升级了 mac80211导致
-
-    sed -ri '/^KERNEL_PATCHVER=/s#'"${kernel_ver}"'#5.4#' target/linux/rockchip/Makefile
-    # if grep -Pq '^PKG_VERSION:=5.15.33-1' package/kernel/mac80211/Makefile;then
-    #     git revert 66d19a4e3673b30594b5de3b8d226160a0032af5
-    #     curl https://raw.githubusercontent.com/coolsnowwolf/lede/08a65772566438d2a6ab03f97e3b21e7569b2fcc/package/kernel/mac80211/files/lib/netifd/wireless/mac80211.sh > package/kernel/mac80211/files/lib/netifd/wireless/mac80211.sh 
+    # https://github.com/coolsnowwolf/lede/commit/f66ea169c0ec229f46c32d886f7a0411f909ad2a
+    # 2022/08/05 可能要暂时屏蔽掉 5.15 5.19 内核
+    # if [ "$build_target" = r2s ] && echo "$kernel_ver" | grep -Pq '5.1[89]';then
+    #     sed -ri '/^KERNEL_PATCHVER=/s#'"${kernel_ver}"'#5.4#' target/linux/rockchip/Makefile
     # fi
 
+    kernel_ver=$(grep -Po '^KERNEL_PATCHVER=\K\S+' target/linux/rockchip/Makefile)
+    if echo "$kernel_ver" | grep -Pq '5.1[589]';then
+        sed -ri '/kmod-(ath6k|carl9170|libertas-usb|rsi91x)/d' .config
+    fi
 
-    # use latest driver of rtl8821CU
+    # https://github.com/coolsnowwolf/lede/issues/9922
+    sed -ri '/^\s*TARGET_DEVICES\s.+?(fastrhino_r66s|firefly_station-p2|friendlyelec_nanopi-r5s)/d' target/linux/rockchip/image/armv8.mk
+
+    # #use latest driver of rtl8821CU
+    # if [ -f package/kernel/rtl8821cu/Makefile ];then
     # sed -i 's/PKG_SOURCE_VERSION:=.*/PKG_SOURCE_VERSION:=master/' package/kernel/rtl8821cu/Makefile
     # sed -i 's/PKG_MIRROR_HASH:=.*/PKG_MIRROR_HASH:=skip/' package/kernel/rtl8821cu/Makefile
+    # fi
 
 fi
-
-
 
 # merge_package "-b 18.06 https://github.com/jerrykuku/luci-theme-argon"
 # merge_package "https://github.com/jerrykuku/luci-app-argon-config"
