@@ -28,9 +28,14 @@ if [ "$1" = set ];then
 
     source /tmp/var.sh
 
+    if [ ! -d "${GITHUB_WORKSPACE}/build/${target}" ];then
+        echo "no such target: ${target}"
+        exit 2
+    fi
+
     echo config: ${config}
     if [ -z "${repo_json}" ] ;then
-        bash build/${target}/set_matrix.sh
+        bash ${GITHUB_WORKSPACE}/build/${target}/set_matrix.sh
     else # [{"name":"openwrt","branch":"master","addr":"https://github.com/openwrt/openwrt"}]
         echo "::set-output name=matrix::${repo_json}"
     fi
