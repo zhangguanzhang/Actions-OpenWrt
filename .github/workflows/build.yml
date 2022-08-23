@@ -715,16 +715,27 @@ jobs:
 
           bash -x ${GITHUB_WORKSPACE}/common/cache.sh upload
             
-          echo '${{ toJson(github.event.inputs) }}' > /tmp/test
+          
           # 缓存损坏或者初次缓存的时候，开启了 IB
           # 则再次 run 本次参数的 workflow
           timeout 5 gh -R ${GITHUB_REPOSITORY} run watch ${{ github.run_id }} > /tmp/watch_txt || true
           # 取第一个需要 rerun 的 job 名字，否则如果是 2 个没缓存的 matrix，只需要一个 job 去执行 gh workflow run 
           first_rerun_job=$(awk '$0~/\(ID [0-9]+/{$1="";flag=$0};flag && $0~"gh-rerun-condition"{if($1=="-"){flag="";next;}else{print flag;exit;}}' /tmp/watch_txt)
           if [ "${CACHE}" = false -a "${USED_CONFIG_IB}" = true ] && echo "$first_rerun_job" | grep -qw "$JOB_NAME";then
-            workFlow=$( echo  ${{ github.event.workflow }} | sed -r 's#.github/workflows/##')
-            cat /tmp/test | gh workflow run $workFlow -r ${GITHUB_REF##*/} --json
-            rm -f /tmp/test
+            if [ "${{ github.event_name }}" == workflow_dispatch ];then
+              echo '${{ toJson(github.event.inputs) }}' > /tmp/test
+              workFlow=$( echo  ${{ github.event.workflow }} | sed -r 's#.github/workflows/##')
+              cat /tmp/test | gh workflow run $workFlow -r ${GITHUB_REF##*/} --json
+              rm -f /tmp/test
+            else # repository_dispatch
+              curl -X POST https://api.github.com/repos/${{ github.repository }}/dispatches \
+                -H "Accept: application/vnd.github.everest-preview+json" \
+                -H "Authorization: token ${{ secrets.gh_token }}" -d \
+                  '{
+                     "event_type":"${{ github.event.action }}",
+                     "client_payload": "${{ github.event.client_payload }}"
+                   }'
+            fi
           fi
 
           if [ "${os}" = 'self-hosted' ];then

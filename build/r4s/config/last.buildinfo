@@ -1,4 +1,4 @@
-# https://github.com/DHDAXCW/op-rockchip/issues/1#issuecomment-1158375059
+# https://github.com/DHDAXCW/lede-rockchip/issues/1#issuecomment-1158375059
 # 凌动的网卡估计没人用
 # CONFIG_PACKAGE_kmod-rt2500-usb is not set
 # CONFIG_PACKAGE_kmod-rt2800-lib is not set

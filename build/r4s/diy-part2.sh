@@ -79,7 +79,26 @@ EOF
     true
 fi
 
+if echo "$repo_name" | grep -Pq 'DHDAXCW' ;then
+# https://github.com/DHDAXCW/NanoPi-R4S-R4SE/commit/164571cbc87595293606cf370777eda2ca2c8a8d
 
+    cat >> .config  <<'EOF'
+# 开启GPU硬件 
+CONFIG_PACKAGE_kmod-backlight=y
+CONFIG_PACKAGE_kmod-drm=y
+CONFIG_PACKAGE_kmod-drm-kms-helper=y
+CONFIG_PACKAGE_kmod-drm-rockchip=y
+CONFIG_PACKAGE_kmod-fb=y
+CONFIG_PACKAGE_kmod-fb-cfb-copyarea=y
+CONFIG_PACKAGE_kmod-fb-cfb-fillrect=y
+CONFIG_PACKAGE_kmod-fb-cfb-imgblt=y
+CONFIG_PACKAGE_kmod-fb-sys-fops=y
+CONFIG_PACKAGE_kmod-fb-sys-ram=y
+CONFIG_PACKAGE_kmod-gpu-lima=y
+CONFIG_PACKAGE_kmod-multimedia-input=y
+CONFIG_PACKAGE_kmod-video-core=y
+EOF
+fi
 
 # https://github.com/coolsnowwolf/lede/pull/9059
 # https://github.com/immortalwrt/immortalwrt/issues/735
