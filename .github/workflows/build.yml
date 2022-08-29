@@ -733,7 +733,7 @@ jobs:
                 -H "Authorization: token ${{ secrets.gh_token }}" -d \
                   '{
                      "event_type":"${{ github.event.action }}",
-                     "client_payload": "${{ github.event.client_payload }}"
+                     "client_payload": ${{ toJSON(github.event.client_payload) }}
                    }'
             fi
           fi
