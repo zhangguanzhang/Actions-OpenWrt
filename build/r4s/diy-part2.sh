@@ -103,13 +103,18 @@ fi
 # https://github.com/coolsnowwolf/lede/pull/9059
 # https://github.com/immortalwrt/immortalwrt/issues/735
 # 只有lede 和骷髅头修复了这个问题，这里脚本用 lede 的
+# 2022/09/01 https://github.com/coolsnowwolf/lede/commit/22d08ddd3d23e4ad3b98b943089d03af832c3022 然后又还原了
+# 把 r4s 的无 eeprom mac 逻辑删除，从骷髅头的获取覆盖
+if ! grep -Pq '/sys/bus/i2c/devices/2-0051/eeprom' target/linux/rockchip/armv8/base-files/etc/board.d/02_network;then
+    curl -s https://raw.githubusercontent.com/DHDAXCW/lede-rockchip/d1599efbcf664e29dd23aebd72b6cd31887a7b7d/target/linux/rockchip/armv8/base-files/etc/board.d/02_network > target/linux/rockchip/armv8/base-files/etc/board.d/02_network
+fi
+mac_patch_file=$(grep -P '^\+\s+.+?\<&mac_address\>' target/linux/rockchip/patches-${kernel_ver}/* | cut -d ':' -f 1)
+if [ -n "$mac_patch_file" ];then
+    sed_num=$( grep -Pn '^\+\s+.+?\<&mac_address\>' $mac_patch_file | awk -F':' '{print $1-1}' )
+    sed -ri "$sed_num,$[sed_num+3]s#^\+([^/])#+//\1#" $mac_patch_file
+fi
+
 if [ "$repo_name" != 'lede' ] && [ "$repo_name" != 'DHDAXCW' ];then
-    curl -s https://raw.githubusercontent.com/coolsnowwolf/lede/master/target/linux/rockchip/armv8/base-files/etc/board.d/02_network > target/linux/rockchip/armv8/base-files/etc/board.d/02_network
-    mac_patch_file=$(grep -P '^\+\s+.+?\<&mac_address\>' target/linux/rockchip/patches-${kernel_ver}/* | cut -d ':' -f 1)
-    if [ -n "$mac_patch_file" ];then
-        sed_num=$( grep -Pn '^\+\s+.+?\<&mac_address\>' $mac_patch_file | awk -F':' '{print $1-1}' )
-        sed -ri "$sed_num,$[sed_num+3]s#^\+([^/])#+//\1#" $mac_patch_file
-    fi
     # https://github.com/immortalwrt/immortalwrt/discussions/736
     if [ "$repo_branch" = 'openwrt-18.06-k5.4' ];then
         if [ -z "$(awk '/^CMAKE_HOST_OPTIONS/{flag=1}flag==1{if($0~"DFEATURE_glib=OFF"){print 1}}flag==1&&(flag==1)&&/^\s*$/{exit;}' ./feeds/packages/libs/qt6base/Makefile)" ];then

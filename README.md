@@ -2,7 +2,7 @@
 
 ### 支持的设备列表
 
-lede 只有 master 分支，op 目前只有官方的 openwrt-21.02 分支看是能用的地步，immortalwrt(天灵) 的编译的话插件很多，最好 action 机器频率要 2700 以上
+lede 仓库因为某些原因，会删掉某些 rockchip 设备的支持，这种情况请使用 骷髅头的版本(DHDAXCW) ，op 目前只有官方的 openwrt-21.02 分支看是能用的地步，immortalwrt(天灵) 的编译的话插件很多，最好 action 机器频率要 2700 以上
 
 |  设备(👇点击下载)   | 支持的 源码-分支 列表  | 可脚本在线升级 | slim本地源 |  备注 |
 |  ------ | ------------------  | -------  |----  | ----  |
@@ -15,7 +15,7 @@ lede 只有 master 分支，op 目前只有官方的 openwrt-21.02 分支看是�
 | [RaspberryPi4](https://github.com/zhangguanzhang/Actions-OpenWrt/releases/tag/RaspberryPi4)| [immortalwrt](https://github.com/immortalwrt/immortalwrt/tree/openwrt-18.06-k5.4) | ✔ | ✔ |  | 
 | [r1s-h3](https://github.com/zhangguanzhang/Actions-OpenWrt/releases/tag/r1s-h3)  | [lede](https://github.com/coolsnowwolf/lede) | ✔ | ✔ | 暂时没添加其他源码，sd卡可以，emcc刷入无法启动，不是我的锅 | 
 | [r1s-h5](https://github.com/zhangguanzhang/Actions-OpenWrt/releases/tag/r1s-h5)  | [immortalwrt](https://github.com/immortalwrt/immortalwrt/tree/openwrt-18.06-k5.4) | X | ✔ | 内存 500M，无法在线升级扩容 | 
-| [doornet2](https://github.com/zhangguanzhang/Actions-OpenWrt/releases/tag/doornet2)  | [lede](https://github.com/coolsnowwolf/lede)、[DHDAXCW](https://github.com/DHDAXCW/lede-rockchip/tree/doornet2) | ✔ | ✔ |  |
+| [doornet2](https://github.com/zhangguanzhang/Actions-OpenWrt/releases/tag/doornet2)  | [lede](https://github.com/coolsnowwolf/lede)、[DHDAXCW](https://github.com/DHDAXCW/lede-rockchip/tree/doornet2) | ✔ | ✔ | 2022/09/01 lede 仓库删掉 doornet2支持，后续请使用骷髅头版本 |
 | N1  | [lede](https://github.com/coolsnowwolf/lede) |  x | x | 暂时没空适配在线升级和slim | 
 | k2p  | [lede](https://github.com/coolsnowwolf/lede) |  x | x | 暂时没空适配在线升级和slim | 
 | sft1200  | [Siflower](https://github.com/Siflower/1806_SDK.git) |  x | x | 暂时没空适配在线升级和slim | 
