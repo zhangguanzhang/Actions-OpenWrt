@@ -191,16 +191,17 @@ jobs:
         if [ -f "init_runner.sh" ];then
             bash init_runner.sh
         else
-          curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg | sudo dd of=/usr/share/keyrings/githubcli-archive-keyring.gpg
-          echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" | \
-            sudo tee /etc/apt/sources.list.d/github-cli.list > /dev/null
+          # curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg | sudo dd of=/usr/share/keyrings/githubcli-archive-keyring.gpg
+          # echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" | \
+          #   sudo tee /etc/apt/sources.list.d/github-cli.list > /dev/null
+          # 包管理安装可能会失败
           if [ "${os}" != 'self-hosted' ];then
             sudo rm -rf /etc/apt/sources.list.d/* /usr/share/dotnet /usr/local/lib/android /opt/ghc
           fi
           sudo -E apt-get -qq update
           #sudo apt-cache search lib32gcc1
           sudo -E apt-get -qq install $(curl -fsSL git.io/depends-ubuntu-2004 | sed -r 's/lib32gcc1\S*//') \
-              zstd upx jq pv ccache gh $(sudo apt-cache search lib32gcc1 | awk 'NR==1{if($1=="lib32gcc1"){print $1}else{print "lib32gcc-s1"}}') skopeo parallel
+              zstd upx jq pv ccache $(sudo apt-cache search lib32gcc1 | awk 'NR==1{if($1=="lib32gcc1"){print $1}else{print "lib32gcc-s1"}}') skopeo parallel
           sudo -E apt-get -qq autoremove --purge
           sudo -E apt-get -qq clean
           sudo timedatectl set-timezone "$TZ"
@@ -208,6 +209,11 @@ jobs:
           # install github cli tool
           # gh 的 cli 用于构建缓存存储，这里加 env 判断防止 fork 的人不知道怎么设置而构建失败
           if [ -n "${{ secrets.gh_token }}" ];then
+            wget -q $(curl -s https://api.github.com/repos/cli/cli/releases/latest | jq -r '.assets[] | select(.name|match("linux_amd64.tar.gz$")) | .browser_download_url')
+            tar zxf gh_*_linux_amd64.tar.gz
+            find gh_* -type f -name gh -exec mv {} /usr/local/bin/ \;
+            rm -rf gh_*linux*
+            sudo chmod a+x /usr/local/bin/gh
             gh --version
             echo ${{ secrets.gh_token }} | gh auth login --with-token
           fi
@@ -818,9 +824,16 @@ jobs:
         if [ "${os}" != 'self-hosted' ];then
           sudo rm -rf /etc/apt/sources.list.d/* /usr/share/dotnet /usr/local/lib/android /opt/ghc
         fi
-        curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg | sudo dd of=/usr/share/keyrings/githubcli-archive-keyring.gpg
-        echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" | \
-          sudo tee /etc/apt/sources.list.d/github-cli.list > /dev/null
+        # curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg | sudo dd of=/usr/share/keyrings/githubcli-archive-keyring.gpg
+        # echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" | \
+        #   sudo tee /etc/apt/sources.list.d/github-cli.list > /dev/null
+        # 包管理偶尔会安装失败
+          wget -q $(curl -s https://api.github.com/repos/cli/cli/releases/latest | jq -r '.assets[] | select(.name|match("linux_amd64.tar.gz$")) | .browser_download_url')
+          tar zxf gh_*_linux_amd64.tar.gz
+          find gh_* -type f -name gh -exec mv {} /usr/local/bin/ \;
+          rm -rf gh_*linux*
+          sudo chmod a+x /usr/local/bin/gh
+
         sudo -E apt-get -qq update
         sudo -E apt-get -qq install qemu-utils git gh gawk unzip patch autoconf automake upx wget curl rsync jq rename 
         sudo -E apt-get -qq autoremove --purge
