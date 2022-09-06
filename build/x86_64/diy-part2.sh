@@ -13,6 +13,11 @@
 # Modify default IP
 #sed -i 's/192.168.1.1/192.168.50.5/g' package/base-files/files/bin/config_generate
 
+kernel_ver=$(grep -Po '^KERNEL_PATCHVER=\K\S+' target/linux/x86/Makefile)
+# 519 问题很多，回退到 515
+if [ "$build_target" = x86_64 ] && echo "$kernel_ver" | grep -Pq '5.1[89]';then
+    sed -ri '/^KERNEL_PATCHVER=/s#'"${kernel_ver}"'#5.15#' target/linux/x86/Makefile
+fi
 
 # rtl8812bu 貌似无法工作
 # rm -rf package/kernel/rtl88x2bu

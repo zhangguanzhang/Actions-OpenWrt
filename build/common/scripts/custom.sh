@@ -116,6 +116,18 @@ pushd openwrt
 grep -Eq '^CONFIG_IB=y' .config && sed -ri 's#(^CONFIG_PACKAGE_luci-app-[^A-Z]*=)y#\1m#' .config
 sed -ri '/[-_]static=m/d' .config
 sed -ri '/luci-app-.+?_dynamic=m/s#=m#=y#' .config
+
+if [ "$repo_name" == 'immortalwrt' ];then
+    # https://github.com/immortalwrt/immortalwrt/discussions/783
+    if grep -Pq '^CONFIG_PACKAGE_ntfs-3g=y' .config;then
+cat >> .config <<'EOF'
+# CONFIG_PACKAGE_ntfs-3g is not set
+# CONFIG_PACKAGE_ntfs-3g-utils is not set
+CONFIG_PACKAGE_ntfs3-mount=y
+EOF
+    fi
+fi
+
 cp .config befor_defconfig.buildinfo
 make defconfig
 sed -i -E 's/# (CONFIG_.*_COMPRESS_UPX) is not set/\1=y/' .config

@@ -1,7 +1,8 @@
 #!/bin/bash
 
 if [ ! -f /usr/local/bin/yq ];then
-    curl -sLo /usr/local/bin/yq  https://github.com/$( curl -sL https://github.com/mikefarah/yq/releases/latest | grep -Pom1 'href="/\K.+?yq_linux_amd64' )
+    #curl -sLo /usr/local/bin/yq  https://github.com/$( curl -sL https://github.com/mikefarah/yq/releases/latest | grep -Pom1 'href="/\K.+?yq_linux_amd64' )
+    curl -sLo /usr/local/bin/yq  $(curl -L https://api.github.com/repos/mikefarah/yq/releases/latest | jq -r '.assets[]|select(.name|match("linux_amd64$"))|.browser_download_url')
     sudo chmod a+x /usr/local/bin/yq
 fi
 
@@ -47,6 +48,7 @@ fi
 
 if [ ! -f /tmp/var.sh ];then
     yq -P /tmp/github.json | sed -r 's#: #=#' > /tmp/var.sh
+    cat /tmp/var.sh
     source /tmp/var.sh
     cat /tmp/var.sh >>  $GITHUB_ENV
 fi

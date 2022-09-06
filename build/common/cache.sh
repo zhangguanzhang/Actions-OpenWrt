@@ -308,22 +308,22 @@ case $action in
         fi
     ;;
     upload)
-        cache_file_count=`grep -E "${cache_name}.img.zst" /tmp/cache_list| wc -l`
-        # 不行 skopeo --insecure-policy delete --authfile ~/.docker/config.json docker://${repo_user}/openwrt_cache:{}
-        if [ "$Avail_G_NUM" -gt ${Need_Avail_G_NUM} -a "$cache_file_count" -lt 10 ] && zstdmt -c --long ${cache_name}.img | split --numeric=1 -b 2000m - ${cache_name}.img.zst.;then
-            rm -f ${cache_name}.img # 减少容量
-            last_file_name=$(ls ${cache_name}.img.zst.* | tail -n1)
-            ls ${cache_name}.img.zst.*| parallel -j4 "docker_build_push {}"
-        else
-            echo "切割失败，容量爆满，开始单线程顺序临时文件占用方式上传"
+        # cache_file_count=`grep -E "${cache_name}.img.zst" /tmp/cache_list| wc -l`
+        # # 不行 skopeo --insecure-policy delete --authfile ~/.docker/config.json docker://${repo_user}/openwrt_cache:{}
+        # if [ "$Avail_G_NUM" -gt ${Need_Avail_G_NUM} -a "$cache_file_count" -lt 10 ] && zstdmt -c --long ${cache_name}.img | split --numeric=1 -b 2000m - ${cache_name}.img.zst.;then
+        #     rm -f ${cache_name}.img # 减少容量
+        #     last_file_name=$(ls ${cache_name}.img.zst.* | tail -n1)
+        #     ls ${cache_name}.img.zst.*| parallel -j4 "docker_build_push {}"
+        # else
+            # echo "切割失败，容量爆满，开始单线程顺序临时文件占用方式上传"
             df -h
-            rm -f ${cache_name}.img.zst.*
+            # rm -f ${cache_name}.img.zst.*
 
             zstdmt -c --long ${cache_name}.img | split --numeric=1 -b 2000m \
                 --filter "cat /dev/stdin > \$FILE;  docker_build_push \$FILE; rm -f \$FILE; echo \$FILE > /tmp/count_num" - ${cache_name}.img.zst.
             rm -f ${cache_name}.img Dockerfile # 减少容量
             last_file_name=$(cat /tmp/count_num)
-        fi
+        # fi
         if [ -n "$last_file_name" ];then
             # 删除多余的缓存
             set +x # 这个区域关闭调试输出，防止token泄漏

@@ -460,7 +460,7 @@ jobs:
                 time timeout $timeoutSec make package/compile -j1 V=s IGNORE_ERRORS=1 || make package/index
               fi
             else
-              time make package/install
+              time make package/install || make package/install -j1 V=s
               timeoutSec=$(( 6*60*60 - ${reserved_time}*60 - $usedSec  ))
               if [ $timeoutSec -gt 0 ];then
                 command="timeout $timeoutSec"
@@ -751,6 +751,7 @@ jobs:
 
     - name: Delete workflow runs
       uses: GitRML/delete-workflow-runs@main
+      continue-on-error: true
       with:
         retain_days: 5
         keep_minimum_runs: 7

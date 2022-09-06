@@ -122,7 +122,7 @@ if [ "$repo_name" != 'lede' ] && [ "$repo_name" != 'DHDAXCW' ];then
         fi
 
         # 天灵的 18.06 分支源码下，rootfs 得修改下
-        rootfs_size=$( awk -F= '/^CONFIG_TARGET_ROOTFS_PARTSIZE/{print $2+20}' .config )
+        rootfs_size=$( awk -F= '/^CONFIG_TARGET_ROOTFS_PARTSIZE/{print $2+24}' .config )
         if [ -n "$rootfs_size" ];then
             sed -ri '/^CONFIG_TARGET_ROOTFS_PARTSIZE=/s#=[0-9]+$#='"${rootfs_size}"'#' .config
         fi

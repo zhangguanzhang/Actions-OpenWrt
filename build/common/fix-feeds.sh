@@ -130,3 +130,13 @@ if [ "$repo_name" != 'immortalwrt' ];then
     svn co https://github.com/immortalwrt/packages/trunk/net/gowebdav package/custom/gowebdav
     sed -ri 's#../../lang/golang/golang-package.mk$#$(TOPDIR)/feeds/packages/lang/golang/golang-package.mk#' package/custom/gowebdav/Makefile
 fi
+
+if [ "$repo_name" = 'lede' ] || echo "$repo_name" | grep -Pq '^DHDAXCW' ;then
+    # https://github.com/coolsnowwolf/lede/issues/10126
+    if ! grep -Pq 'no-address-of-packed-member' package/network/utils/umbim/Makefile;then
+        sed_num=$(awk '/^TARGET_CFLAGS/{print NR+1}' package/network/utils/umbim/Makefile)
+        sed -ri "$sed_num"'s#$# -Wno-address-of-packed-member#' package/network/utils/umbim/Makefile
+    fi
+    # https://github.com/coolsnowwolf/lede/issues/10161
+    sed -i 's/-fno-rtti/-fno-rtti -std=c++14/g' package/network/services/e2guardian/Makefile
+fi

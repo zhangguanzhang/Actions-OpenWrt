@@ -78,18 +78,6 @@ if echo "$repo_name" | grep -Pq 'DHDAXCW|lede' ;then
     fi
 fi
 
-# enable fan control
-# git apply 报错
-# wget https://github.com/friendlyarm/friendlywrt/commit/cebdc1f94dcd6363da3a5d7e1e69fd741b8b718e.patch
-# git apply cebdc1f94dcd6363da3a5d7e1e69fd741b8b718e.patch
-# rm cebdc1f94dcd6363da3a5d7e1e69fd741b8b718e.patch
-# sed -i 's/pwmchip1/pwmchip0/' target/linux/rockchip/armv8/base-files/usr/bin/fa-fancontrol.sh target/linux/rockchip/armv8/base-files/usr/bin/fa-fancontrol-direct.sh
-
-
-
-# unblockneteasemusic 的 状态判断是 exec 调用 ps 命令，它没适配 proc-ng-ps 命令会影响 
-# lua_file=`find -type f -name unblockneteasemusic.lua`
-# [ -n "$lua_file" ] && sed -ri '/sys.call.+"ps /s#ps -w#ps aux#' $lua_file
 
 # ----------- 提前打包一些文件，防止初次使用去下载
 # files下会合并到最终的 rootfs 里

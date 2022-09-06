@@ -88,8 +88,8 @@ fi
 
 #svn co https://github.com/immortalwrt/luci/trunk/themes/luci-theme-argon ./package/lean/luci-theme-argon
 
-# Add luci-app-oled (R2S Only)
 if [ "$build_target" = r2s ];then
+    # Add luci-app-oled (R2S Only)
     merge_package https://github.com/NateLol/luci-app-oled
     # enable r2s oled plugin by default
     sed -ri "s/enable\s+'0'/enable '1'/" package/custom/luci-app-oled/root/etc/config/oled
