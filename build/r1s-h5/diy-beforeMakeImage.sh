@@ -6,7 +6,7 @@
 if [ "$suffix" = '-full' ];then
     # full 版本加大一些容量
     # 参考 https://forum.openwrt.org/t/how-to-set-root-filesystem-partition-size-on-x86-imabebuilder/4765/4?u=zhangguanzhang
-    rootfs_size=$( awk -F= '/^CONFIG_TARGET_ROOTFS_PARTSIZE/{print $2+93}' .config )
+    [ "$repo_name" == 'immortalwrt' ] && rootfs_size=$( awk -F= '/^CONFIG_TARGET_ROOTFS_PARTSIZE/{print $2+117}' .config )
 fi
 
 if [ -n "$rootfs_size" ];then

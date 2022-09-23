@@ -139,4 +139,8 @@ if [ "$repo_name" = 'lede' ] || echo "$repo_name" | grep -Pq '^DHDAXCW' ;then
     fi
     # https://github.com/coolsnowwolf/lede/issues/10161
     sed -i 's/-fno-rtti/-fno-rtti -std=c++14/g' package/network/services/e2guardian/Makefile
+
+    # https://github.com/coolsnowwolf/lede/issues/10195
+    sed -ri '/^PKG_SOURCE_URL:=/s#=.+$#=https://sources.openwrt.org/#' ./feeds/packages/utils/jq/Makefile
+    grep PKG_HASH ./feeds/packages/utils/jq/Makefile
 fi

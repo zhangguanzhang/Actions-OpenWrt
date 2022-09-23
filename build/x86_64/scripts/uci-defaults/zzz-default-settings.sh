@@ -23,8 +23,10 @@ fi
 uci set  aliyundrive-webdav.@server[0].enable=0
 uci commit aliyundrive-webdav
 
-uci add_list system.ntp.server=120.25.115.20
-uci commit system
+if ! grep -Eq '120.25.115.20' /etc/config/system;then
+  uci add_list system.ntp.server=120.25.115.20
+  uci commit system
+fi
 
 uci set luci.main.mediaurlbase='/luci-static/argon_blue'
 uci commit luci
@@ -55,5 +57,7 @@ EOF
 uci set dhcp.@dnsmasq[0].rebind_protection='0'
 uci set dhcp.@dnsmasq[0].localservice='0'
 uci set dhcp.@dnsmasq[0].nonwildcard='0'
-uci add_list dhcp.@dnsmasq[0].server='223.5.5.5#53'
+if ! grep -Eq '223.5.5.5' /etc/config/dhcp;then
+  uci add_list dhcp.@dnsmasq[0].server='223.5.5.5#53'
+fi
 uci commit dhcp

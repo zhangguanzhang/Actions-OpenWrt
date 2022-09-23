@@ -12,7 +12,7 @@
 # # fi
 
 if [ "$suffix" = '-full' ];then
-    [ "$repo_name" == 'immortalwrt' ] && rootfs_size=$( awk -F= '/^CONFIG_TARGET_ROOTFS_PARTSIZE/{print $2+80}' .config )
+    [ "$repo_name" == 'immortalwrt' ] && rootfs_size=$( awk -F= '/^CONFIG_TARGET_ROOTFS_PARTSIZE/{print $2+94}' .config )
 fi
 
 if [ -n "$rootfs_size" ];then
