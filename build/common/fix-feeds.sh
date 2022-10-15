@@ -140,7 +140,12 @@ if [ "$repo_name" = 'lede' ] || echo "$repo_name" | grep -Pq '^DHDAXCW' ;then
     # https://github.com/coolsnowwolf/lede/issues/10161
     sed -i 's/-fno-rtti/-fno-rtti -std=c++14/g' package/network/services/e2guardian/Makefile
 
-    # https://github.com/coolsnowwolf/lede/issues/10195
-    sed -ri '/^PKG_SOURCE_URL:=/s#=.+$#=https://sources.openwrt.org/#' ./feeds/packages/utils/jq/Makefile
-    grep PKG_HASH ./feeds/packages/utils/jq/Makefile
+fi
+
+if [ -f ./feeds/packages/utils/jq/Makefile ];then
+    if grep -Pq 'PKG_VERSION.+1.6' ./feeds/packages/utils/jq/Makefile;then
+        # https://github.com/coolsnowwolf/lede/issues/10195
+        #sed -ri '/^PKG_SOURCE_URL:=/s#=.+$#=https://sources.openwrt.org/#' ./feeds/packages/utils/jq/Makefile
+        sed -ri '/^PKG_HASH:=/s#=.+$#=skip#' ./feeds/packages/utils/jq/Makefile
+    fi
 fi

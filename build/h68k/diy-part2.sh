@@ -47,35 +47,42 @@ function merge_package(){
 
 rm -rf package/custom; mkdir package/custom
 
+# 2022/10/18 lede 的固件貌似不区分 h68k-a -c啥的
+if grep -Pq 'hinlink_opc-h68k-a' target/linux/rockchip/image/armv8.mk;then
+    sed -i "2r "<(
+cat  <<'EOF' | sed -r 's#^\s+#\t#'
+CONFIG_TARGET_MULTI_PROFILE=y
+CONFIG_TARGET_DEVICE_rockchip_armv8_DEVICE_hinlink_opc-h68k-a=y
+CONFIG_TARGET_DEVICE_rockchip_armv8_DEVICE_hinlink_opc-h68k-c=y
+EOF
+  ) .config
+else
+    sed -i "2r "<(
+cat  <<'EOF' | sed -r 's#^\s+#\t#'
+CONFIG_TARGET_DEVICE_rockchip_armv8_DEVICE_hinlink_opc-h68k=y
+EOF
+  ) .config
+  if [  -n "$GITHUB_ENV" ];then
+    echo 'firmware_wildcard=h68k' >> $GITHUB_ENV
+  fi
+fi
 
-if [ "$repo_name" = 'lede' ];then
-    # https://github.com/coolsnowwolf/lede/issues/9483
-    # https://github.com/coolsnowwolf/lede/pull/9457/files#diff-38a2e413df332b2dd0c3651ef57bd9544c2224faa0bf9fb7712daf769e12fa67L449-L470
-    # https://github.com/coolsnowwolf/lede/commit/ee7d9cff629778e16d1a34abc04ea3d6524d56bb#diff-38a2e413df332b2dd0c3651ef57bd9544c2224faa0bf9fb7712daf769e12fa67R470
-    if [ "$kernel_ver" = '5.10' ] || [ "$kernel_ver" = '5.4' ];then
-        sed -ri '/=CONFIG_CRYPTO_LIB_BLAKE2S/{n;s/HIDDEN:=1/DEPENDS:=@(LINUX_5_4||LINUX_5_10)/;}' package/kernel/linux/modules/crypto.mk
-        for SED_NUM in $( grep -En 'blake2s(|-generic|-arm).ko' package/kernel/linux/modules/crypto.mk |  awk -F: '$0~":"{print $1}');do
-            sed -ri "${SED_NUM}s#@lt5.9##" package/kernel/linux/modules/crypto.mk
-        done
-    fi
-
-    # https://github.com/coolsnowwolf/lede/issues/9803
-    # lede 暂时删掉 ath6kl ，原因是 https://github.com/coolsnowwolf/lede/commit/66d19a4e3673b30594b5de3b8d226160a0032af5 升级了 mac80211导致
-    # 2022/08/05 可能要暂时屏蔽掉 5.15 5.19 内核
-    # sed -ri '/^KERNEL_PATCHVER=/s#'"${kernel_ver}"'#5.4#' target/linux/rockchip/Makefile
-
-    # #use latest driver of rtl8821CU
-    # if [ -f package/kernel/rtl8821cu/Makefile ];then
-    # sed -i 's/PKG_SOURCE_VERSION:=.*/PKG_SOURCE_VERSION:=master/' package/kernel/rtl8821cu/Makefile
-    # sed -i 's/PKG_MIRROR_HASH:=.*/PKG_MIRROR_HASH:=skip/' package/kernel/rtl8821cu/Makefile
-    # fi
+if [ "$repo_name" = 'DHDAXCW' ];then
+    # 暂时屏蔽 5.19内核
+    sed -ri '/^KERNEL_PATCHVER=/s#'"${kernel_ver}"'#5.4#' target/linux/rockchip/Makefile
 fi
 
 if echo "$repo_name" | grep -Pq 'DHDAXCW|lede' ;then
+    mkdir -p target/linux/rockchip/files-5.4/arch/arm64/boot/dts/rockchip/
+    \cp target/linux/rockchip/files-5.19/arch/arm64/boot/dts/rockchip/*h68k* target/linux/rockchip/files-5.4/arch/arm64/boot/dts/rockchip/
+    \cp target/linux/rockchip/files-5.19/arch/arm64/boot/dts/rockchip/*h68k* target/linux/rockchip/files-5.10/arch/arm64/boot/dts/rockchip/
+    \cp target/linux/rockchip/files-5.19/arch/arm64/boot/dts/rockchip/*h68k* target/linux/rockchip/files-5.15/arch/arm64/boot/dts/rockchip/
     kernel_ver=$(grep -Po '^KERNEL_PATCHVER=\K\S+' target/linux/rockchip/Makefile)
     if echo "$kernel_ver" | grep -Pq '5.1[589]';then
         sed -ri '/kmod-(ath6k|carl9170|libertas-usb|rsi91x|rt2.00-)/d' .config
     fi
+    sed -ri '/ath11k\/ath11k.ko/s#ath11k.ko$#ath11k.ko@ge5.19#' package/kernel/mac80211/ath.mk
+
 fi
 
 # enable fan control

@@ -66,6 +66,8 @@ if [ "$repo_name" = 'lede' ];then
     sed -ri '/^\s*TARGET_DEVICES\s.+?(fastrhino_r66s|firefly_station-p2|friendlyelec_nanopi-r5s)/d' target/linux/rockchip/image/armv8.mk
 fi
 
+kernel_ver=$(grep -Po '^KERNEL_PATCHVER=\K\S+' target/linux/rockchip/Makefile)
+
 if echo "$repo_name" | grep -Pq 'DHDAXCW|lede' ;then
     echo "firmware_wildcard=r4s,r4se" >> $GITHUB_ENV
     sed -ri '/friendlyarm_nanopi-r4s=y/d' .config
@@ -79,25 +81,29 @@ EOF
     true
 fi
 
-if echo "$repo_name" | grep -Pq 'DHDAXCW' ;then
-# https://github.com/DHDAXCW/NanoPi-R4S-R4SE/commit/164571cbc87595293606cf370777eda2ca2c8a8d
+if echo "$repo_name" | grep -Pq 'DHDAXCW' &&  echo "$kernel_ver" | ! grep -Pq '5.15';then
 
+# https://github.com/DHDAXCW/NanoPi-R4S-R4SE/commit/164571cbc87595293606cf370777eda2ca2c8a8d
+# https://github.com/DHDAXCW/lede-rockchip/commit/baf932fd1d96a0bbfe5192974a034741d3448333#comments
     cat >> .config  <<'EOF'
 # 开启GPU硬件 
 CONFIG_PACKAGE_kmod-backlight=y
+CONFIG_PACKAGE_kmod-backlight-pwm=y
 CONFIG_PACKAGE_kmod-drm=y
+CONFIG_PACKAGE_kmod-drm-display-helper=y
 CONFIG_PACKAGE_kmod-drm-kms-helper=y
-CONFIG_PACKAGE_kmod-drm-rockchip=y
+CONFIG_PACKAGE_kmod-drm-ttm=y
 CONFIG_PACKAGE_kmod-fb=y
 CONFIG_PACKAGE_kmod-fb-cfb-copyarea=y
 CONFIG_PACKAGE_kmod-fb-cfb-fillrect=y
 CONFIG_PACKAGE_kmod-fb-cfb-imgblt=y
 CONFIG_PACKAGE_kmod-fb-sys-fops=y
 CONFIG_PACKAGE_kmod-fb-sys-ram=y
-CONFIG_PACKAGE_kmod-gpu-lima=y
 CONFIG_PACKAGE_kmod-multimedia-input=y
 CONFIG_PACKAGE_kmod-video-core=y
+CONFIG_PACKAGE_kmod-drm-rockchip=y
 EOF
+
 fi
 
 # https://github.com/coolsnowwolf/lede/pull/9059

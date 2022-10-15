@@ -129,7 +129,10 @@ EOF
 fi
 
 cp .config befor_defconfig.buildinfo
-make defconfig
+if ! make defconfig;then
+    cat .config 
+    exit 2
+fi
 sed -i -E 's/# (CONFIG_.*_COMPRESS_UPX) is not set/\1=y/' .config
 if grep -Eq '^CONFIG_IB=y' .config;then
     # include 开启，可能有些是二选一，二选一得提前在 config.buildinfo 里开启
