@@ -21,7 +21,7 @@ on:
       target:
         description: 'build/${target} to build'
         required: false
-        default: 'r2s' #'x86_64'
+        default: 'x86_64' #'x86_64'
       envOverride:
         description: 'key=value,key2=value2'
         required: false
