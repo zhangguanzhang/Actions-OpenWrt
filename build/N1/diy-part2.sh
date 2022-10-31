@@ -19,6 +19,14 @@
 sed -ri 's/luci-theme-\S+/luci-theme-argonne/g' feeds/luci/collections/luci/Makefile  # feeds/luci/modules/luci-base/root/etc/config/luci
 
 
+if [ "$repo_name" = 'lede' ];then
+    # https://github.com/coolsnowwolf/lede/issues/10329
+    depend_line=$(awk '/KernelPackage\/rtw88*$/{flag=1}flag{flag++}flag>0&&flag<=7&&/^\s*DEPENDS/&& $0!~"usb-core"{print NR;exit}' ./package/kernel/mac80211/realtek.mk)
+    if [ -n "$depend_line" ];then
+        sed -ri "${depend_line}"'s#$# +kmod-usb-core#' ./package/kernel/mac80211/realtek.mk
+    fi
+fi
+
 # luci-theme-atmaterial_new
 # https://github.com/kenzok8/openwrt-packages 已经添加了，所以这里备用拉取
 if [ ! -d feeds/others/luci-theme-atmaterial_new ];then

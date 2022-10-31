@@ -60,6 +60,9 @@ if [ "$repo_name" = 'lede' ];then
 fi
 
 if [ "$repo_name" = 'lede' ] || [ "$repo_name" == 'DHDAXCW' ];then
+    # doornet2 2022、10、31 编译不成功
+    rm -rf feeds/routing/cjdns feeds/routing/luci-app-cjdns
+
     # https://github.com/coolsnowwolf/lede/issues/9803
     # https://github.com/coolsnowwolf/lede/issues/9939
     if echo "$kernel_ver" | grep -Pq '5.1[89]';then

@@ -4,8 +4,15 @@ if [ -z "$repository_owner" ] && [ -f "$GITHUB_ENV" ];then
     source $GITHUB_ENV
 fi
 
+repo_user=${GITHUB_REPOSITORY%%/*}
+
 : ${cache_func:=dockerhub} ${Need_Avail_G_NUM:=15}
 #: ${cache_func:=github_release}
+
+if [ "$repo_user" = 'zhangguanzhang' ];then
+    cache_func=github_release
+    cache_repo=action_cache
+fi
 
 # cache 实现要求
 # 下载的时候，需要生成 /tmp/cache_list 存放文件，每行一个，用于上传的判断数量大于10没有

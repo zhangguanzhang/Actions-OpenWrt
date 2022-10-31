@@ -46,8 +46,10 @@ if [ "$repo_name" = 'lede' ] || [ "$repo_branch" = 'openwrt-18.06-k5.4' ] || ech
     #     rm -rf ./feeds/routing/cjdns
     #     svn export https://github.com/openwrt/routing/trunk/cjdns ./feeds/routing/cjdns
     # fi
-    rm -rf ./feeds/routing/cjdns
-    svn export https://github.com/openwrt/routing/branches/openwrt-21.02/cjdns ./feeds/routing/cjdns
+    if [ -d ./feeds/routing/cjdns ];then
+        rm -rf ./feeds/routing/cjdns
+        svn export https://github.com/openwrt/routing/branches/openwrt-21.02/cjdns ./feeds/routing/cjdns
+    fi
 
 fi
 
@@ -103,14 +105,6 @@ fi
 # 'package/feeds/others/luci-app-unblockneteasemusic/Makefile' has a dependency on 'ucode'
 [ ! -d package/utils/ucode ] && svn export https://github.com/coolsnowwolf/lede/trunk/package/utils/ucode  package/utils/ucode
 
-if [ "$repo_name" = 'lede' ];then
-
-    if grep -Eq '^CONFIG_IB=y' .config;then
-        # https://github.com/coolsnowwolf/packages/issues/352
-        rm -rf ./feeds/luci/applications/luci-app-docker
-    fi
-fi
-
 
 #[ -f ./feeds/others/luci-theme-argonne/Makefile ] && sed -i '/LUCI_DEPENDS/s#=#&+libc#' ./feeds/others/luci-theme-argonne/Makefile
 if [ -f ./feeds/others/luci-theme-argonne/Makefile ];then
@@ -132,6 +126,11 @@ if [ "$repo_name" != 'immortalwrt' ];then
 fi
 
 if [ "$repo_name" = 'lede' ] || echo "$repo_name" | grep -Pq '^DHDAXCW' ;then
+    if grep -Eq '^CONFIG_IB=y' .config;then
+        # https://github.com/coolsnowwolf/packages/issues/352
+        rm -rf ./feeds/luci/applications/luci-app-docker
+    fi
+
     # https://github.com/coolsnowwolf/lede/issues/10126
     if ! grep -Pq 'no-address-of-packed-member' package/network/utils/umbim/Makefile;then
         sed_num=$(awk '/^TARGET_CFLAGS/{print NR+1}' package/network/utils/umbim/Makefile)
@@ -139,7 +138,10 @@ if [ "$repo_name" = 'lede' ] || echo "$repo_name" | grep -Pq '^DHDAXCW' ;then
     fi
     # https://github.com/coolsnowwolf/lede/issues/10161
     sed -i 's/-fno-rtti/-fno-rtti -std=c++14/g' package/network/services/e2guardian/Makefile
-
+    if [ "$repo_name" = 'lede' ];then
+        # https://github.com/coolsnowwolf/lede/issues/10492#issuecomment-1328300924
+        sed -i 's/-liconv"/"/g' package/feeds/packages/irqbalance/Makefile
+    fi
 fi
 
 if [ -f ./feeds/packages/utils/jq/Makefile ];then

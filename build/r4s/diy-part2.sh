@@ -17,6 +17,10 @@
 
 kernel_ver=$(grep -Po '^KERNEL_PATCHVER=\K\S+' target/linux/rockchip/Makefile)
 
+if [ -z "$kernel_ver" ];then
+    pwd
+    cat target/linux/rockchip/Makefile
+fi
 
 function merge_package(){
     local pn=$1
@@ -52,6 +56,11 @@ if [ "$repo_name" = 'lede' ];then
         done
     fi
 
+    # https://github.com/coolsnowwolf/lede/issues/10359
+    if [ -f package/kernel/rtl88x2bu/Makefile ];then
+        rm -rf package/kernel/rtl88x2bu
+    fi
+
     # use latest driver of rtl8821CU
     if [ -f package/kernel/rtl8821cu/Makefile ];then
         sed -i 's/PKG_SOURCE_VERSION:=.*/PKG_SOURCE_VERSION:=master/' package/kernel/rtl8821cu/Makefile
@@ -81,7 +90,7 @@ EOF
     true
 fi
 
-if echo "$repo_name" | grep -Pq 'DHDAXCW' &&  echo "$kernel_ver" | ! grep -Pq '5.15';then
+if echo "$repo_name" | grep -Pq 'DHDAXCW' &&  ! echo "$kernel_ver" | grep -Pq '5.15';then
 
 # https://github.com/DHDAXCW/NanoPi-R4S-R4SE/commit/164571cbc87595293606cf370777eda2ca2c8a8d
 # https://github.com/DHDAXCW/lede-rockchip/commit/baf932fd1d96a0bbfe5192974a034741d3448333#comments

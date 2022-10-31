@@ -530,7 +530,7 @@ function opkgUpdate(){
 # newifi d2 固件格式的 lsblk 很奇怪，日后看看
 function auto_set_block_var(){
     local block rootfs_part
-    rootfs_part=$(lsblk --output NAME,FSTYPE,LABEL,MOUNTPOINT | awk '($4=="/"&&tolower($3)~/rootfs/)||($2=="squashfs"&&$3=="/rom"){print $1}' | sed -r 's/[^a-zA-Z0-9]//g')
+    rootfs_part=$(lsblk --output NAME,FSTYPE,LABEL,MOUNTPOINT | awk '($4=="/"&&tolower($3)~/rootfs/)||($2=="squashfs"&&$3=="/rom"){print $1}' | sed -r 's/[^a-zA-Z0-9]//g' | grep -v loop)
     [ -z "$rootfs_part" ] && err "自动获取根分区所在块设备失败"
     #for block in `ls -l /dev/ | awk '$1~/^br/&&$NF!~/loop|ram/{print $NF}'`;do
     for block in `ls -1 /sys/block/ | grep -Ev 'loop|ram'`;do
