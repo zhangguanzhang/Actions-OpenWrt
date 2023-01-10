@@ -28,8 +28,8 @@ sed -i "${SED_NUM}d " feeds/packages/lang/python/python3/Makefile
 
 
 
-svn export --force https://github.com/coolsnowwolf/lede/trunk/tools/upx   tools/upx
-svn export --force https://github.com/coolsnowwolf/lede/trunk/tools/ucl   tools/ucl
+svn export --force https://github.com/coolsnowwolf/lede/trunk/package/lean/upx   tools/upx
+svn export --force https://github.com/coolsnowwolf/lede/trunk/package/lean/ucl   tools/ucl
 svn export --force https://github.com/coolsnowwolf/lede/trunk/tools/ninja tools/ninja
 
 

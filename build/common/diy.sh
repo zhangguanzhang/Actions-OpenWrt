@@ -22,13 +22,14 @@ fi
 
 # openwrt 的目录里没这目录
 # https://github.com/coolsnowwolf/lede/issues/3462
-[ ! -d tools/upx ] && svn export https://github.com/coolsnowwolf/lede/trunk/tools/upx   tools/upx
-[ ! -d tools/ucl ] && svn export https://github.com/coolsnowwolf/lede/trunk/tools/ucl   tools/ucl
-if ! grep -q upx tools/Makefile;then
-    SED_NUM=$(awk '$1=="tools-y"{a=NR}$1~/tools-\$/{print a;exit}' tools/Makefile)
-    sed -ri "${SED_NUM}a tools-y += ucl upx" tools/Makefile
-    sed -ri '/dependencies/a $(curdir)/upx/compile := $(curdir)/ucl/compile' tools/Makefile
-fi
+# https://github.com/coolsnowwolf/lede/issues/10754 删掉了 upx 和 ucl
+# [ ! -d tools/upx ] && svn export https://github.com/coolsnowwolf/lede/trunk/tools/upx   tools/upx
+# [ ! -d tools/ucl ] && svn export https://github.com/coolsnowwolf/lede/trunk/tools/ucl   tools/ucl
+# if ! grep -q upx tools/Makefile;then
+#     SED_NUM=$(awk '$1=="tools-y"{a=NR}$1~/tools-\$/{print a;exit}' tools/Makefile)
+#     sed -ri "${SED_NUM}a tools-y += ucl upx" tools/Makefile
+#     sed -ri '/dependencies/a $(curdir)/upx/compile := $(curdir)/ucl/compile' tools/Makefile
+# fi
 
 # Modify default theme
 # https://github.com/jerrykuku/luci-theme-argon/tree/18.06
